@@ -1,0 +1,43 @@
+export interface IndiaRegion { name:string; code:string; type:"State"|"Union Territory"; capital:string; cities:string[]; x:number; y:number }
+
+export const indiaRegions:IndiaRegion[]=[
+ {name:"Andhra Pradesh",code:"AP",type:"State",capital:"Amaravati",cities:["Visakhapatnam","Vijayawada","Guntur","Tirupati","Nellore","Kurnool","Rajahmundry"],x:57,y:70},
+ {name:"Arunachal Pradesh",code:"AR",type:"State",capital:"Itanagar",cities:["Itanagar","Tawang","Pasighat","Ziro"],x:87,y:27},
+ {name:"Assam",code:"AS",type:"State",capital:"Dispur",cities:["Guwahati","Dibrugarh","Silchar","Jorhat","Tezpur"],x:82,y:35},
+ {name:"Bihar",code:"BR",type:"State",capital:"Patna",cities:["Patna","Gaya","Muzaffarpur","Bhagalpur","Darbhanga"],x:65,y:43},
+ {name:"Chhattisgarh",code:"CG",type:"State",capital:"Raipur",cities:["Raipur","Bhilai","Bilaspur","Korba","Jagdalpur"],x:54,y:55},
+ {name:"Goa",code:"GA",type:"State",capital:"Panaji",cities:["Panaji","Margao","Vasco da Gama","Mapusa"],x:36,y:70},
+ {name:"Gujarat",code:"GJ",type:"State",capital:"Gandhinagar",cities:["Ahmedabad","Surat","Vadodara","Rajkot","Gandhinagar","Bhavnagar"],x:30,y:47},
+ {name:"Haryana",code:"HR",type:"State",capital:"Chandigarh",cities:["Gurugram","Faridabad","Panipat","Ambala","Rohtak","Hisar"],x:44,y:30},
+ {name:"Himachal Pradesh",code:"HP",type:"State",capital:"Shimla",cities:["Shimla","Dharamshala","Manali","Solan","Mandi"],x:47,y:19},
+ {name:"Jharkhand",code:"JH",type:"State",capital:"Ranchi",cities:["Ranchi","Jamshedpur","Dhanbad","Bokaro","Deoghar"],x:65,y:50},
+ {name:"Karnataka",code:"KA",type:"State",capital:"Bengaluru",cities:["Bengaluru","Mysuru","Mangaluru","Hubballi","Belagavi","Kalaburagi"],x:43,y:76},
+ {name:"Kerala",code:"KL",type:"State",capital:"Thiruvananthapuram",cities:["Kochi","Thiruvananthapuram","Kozhikode","Thrissur","Kannur","Alappuzha"],x:43,y:88},
+ {name:"Madhya Pradesh",code:"MP",type:"State",capital:"Bhopal",cities:["Indore","Bhopal","Jabalpur","Gwalior","Ujjain","Sagar"],x:46,y:51},
+ {name:"Maharashtra",code:"MH",type:"State",capital:"Mumbai",cities:["Mumbai","Pune","Nagpur","Nashik","Thane","Navi Mumbai","Aurangabad","Kolhapur"],x:39,y:61},
+ {name:"Manipur",code:"MN",type:"State",capital:"Imphal",cities:["Imphal","Thoubal","Churachandpur"],x:86,y:42},
+ {name:"Meghalaya",code:"ML",type:"State",capital:"Shillong",cities:["Shillong","Tura","Jowai"],x:78,y:39},
+ {name:"Mizoram",code:"MZ",type:"State",capital:"Aizawl",cities:["Aizawl","Lunglei","Champhai"],x:84,y:47},
+ {name:"Nagaland",code:"NL",type:"State",capital:"Kohima",cities:["Kohima","Dimapur","Mokokchung"],x:88,y:37},
+ {name:"Odisha",code:"OD",type:"State",capital:"Bhubaneswar",cities:["Bhubaneswar","Cuttack","Rourkela","Puri","Sambalpur"],x:63,y:59},
+ {name:"Punjab",code:"PB",type:"State",capital:"Chandigarh",cities:["Ludhiana","Amritsar","Jalandhar","Patiala","Mohali"],x:41,y:24},
+ {name:"Rajasthan",code:"RJ",type:"State",capital:"Jaipur",cities:["Jaipur","Jodhpur","Udaipur","Kota","Ajmer","Bikaner"],x:34,y:40},
+ {name:"Sikkim",code:"SK",type:"State",capital:"Gangtok",cities:["Gangtok","Namchi","Gyalshing"],x:72,y:37},
+ {name:"Tamil Nadu",code:"TN",type:"State",capital:"Chennai",cities:["Chennai","Coimbatore","Madurai","Tiruchirappalli","Salem","Tiruppur","Hosur"],x:52,y:86},
+ {name:"Telangana",code:"TG",type:"State",capital:"Hyderabad",cities:["Hyderabad","Warangal","Nizamabad","Karimnagar","Khammam"],x:51,y:67},
+ {name:"Tripura",code:"TR",type:"State",capital:"Agartala",cities:["Agartala","Dharmanagar","Udaipur"],x:80,y:46},
+ {name:"Uttar Pradesh",code:"UP",type:"State",capital:"Lucknow",cities:["Lucknow","Noida","Ghaziabad","Kanpur","Varanasi","Agra","Prayagraj","Meerut"],x:53,y:39},
+ {name:"Uttarakhand",code:"UK",type:"State",capital:"Dehradun",cities:["Dehradun","Haridwar","Haldwani","Rishikesh","Roorkee"],x:52,y:25},
+ {name:"West Bengal",code:"WB",type:"State",capital:"Kolkata",cities:["Kolkata","Howrah","Siliguri","Durgapur","Asansol"],x:70,y:52},
+ {name:"Andaman and Nicobar Islands",code:"AN",type:"Union Territory",capital:"Port Blair",cities:["Port Blair","Diglipur","Mayabunder"],x:76,y:84},
+ {name:"Chandigarh",code:"CH",type:"Union Territory",capital:"Chandigarh",cities:["Chandigarh"],x:45,y:25},
+ {name:"Dadra and Nagar Haveli and Daman and Diu",code:"DN",type:"Union Territory",capital:"Daman",cities:["Daman","Diu","Silvassa"],x:32,y:56},
+ {name:"Delhi",code:"DL",type:"Union Territory",capital:"New Delhi",cities:["New Delhi","Delhi","Dwarka","Rohini","Saket","Connaught Place"],x:45,y:34},
+ {name:"Jammu and Kashmir",code:"JK",type:"Union Territory",capital:"Srinagar",cities:["Srinagar","Jammu","Anantnag","Baramulla"],x:39,y:12},
+ {name:"Ladakh",code:"LA",type:"Union Territory",capital:"Leh",cities:["Leh","Kargil"],x:48,y:10},
+ {name:"Lakshadweep",code:"LD",type:"Union Territory",capital:"Kavaratti",cities:["Kavaratti","Agatti","Minicoy"],x:28,y:84},
+ {name:"Puducherry",code:"PY",type:"Union Territory",capital:"Puducherry",cities:["Puducherry","Karaikal","Mahe","Yanam"],x:57,y:84},
+];
+
+export const allIndiaAreas=indiaRegions.flatMap(region=>[region.name,...region.cities]).filter((value,index,array)=>array.indexOf(value)===index).sort();
+export const findRegionForArea=(area:string)=>indiaRegions.find(region=>region.name===area||region.cities.some(city=>area.toLowerCase().includes(city.toLowerCase())));
