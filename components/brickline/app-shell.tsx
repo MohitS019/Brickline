@@ -5,6 +5,7 @@ import { Bell, Menu, Search, UserRound, X } from "lucide-react";
 import type { Role, ViewId } from "@/lib/brickline-data";
 
 const primary: { id: ViewId; label: string }[] = [
+  { id: "client-access", label: "My panel" },
   { id: "map", label: "Explore map" },
   { id: "projects", label: "Projects" },
   { id: "network", label: "Builders" },
@@ -38,12 +39,12 @@ export function AppShell({ children, view, role, mobileOpen, unread, onNavigate,
       <div className="site-actions">
         <button className="site-search" onClick={onSearch} aria-label="Search Brickline"><Search size={18}/><span>Search</span></button>
         <button className="site-alert" onClick={() => go("alerts")} aria-label="Open alerts"><Bell size={18}/>{unread > 0 && <em>{unread}</em>}</button>
-        <label className="site-role"><span className="sr-only">Workspace mode</span><select value={role} onChange={event => onRoleChange(event.target.value as Role)}><option value="Agent">Agent view</option><option value="Builder">Builder view</option><option value="Buyer">Buyer view</option></select></label>
+        <label className="site-role"><span className="sr-only">Preview panel</span><select value={role} onChange={event => onRoleChange(event.target.value as Role)}><option value="Agent">Agent preview</option><option value="Builder">Builder preview</option><option value="Client">Client preview</option></select></label>
         <button className="site-avatar" onClick={() => go("profile")} aria-label="Open profile"><UserRound size={18}/></button>
         <button className="site-menu-toggle" onClick={onMobileToggle} aria-label={mobileOpen ? "Close menu" : "Open menu"}>{mobileOpen ? <X size={22}/> : <Menu size={22}/>}</button>
       </div>
     </header>
-    {mobileOpen && <nav className="site-mobile-nav" aria-label="Mobile navigation">{[...primary, ...secondary].map(item => <button key={item.id} className={view === item.id ? "active" : ""} onClick={() => go(item.id)}>{item.label}</button>)}<div className="mobile-role-choice">{(["Agent", "Builder", "Buyer"] as Role[]).map(option => <button key={option} className={role === option ? "active" : ""} onClick={() => onRoleChange(option)}>{option}</button>)}</div></nav>}
+    {mobileOpen && <nav className="site-mobile-nav" aria-label="Mobile navigation">{[...primary, ...secondary].map(item => <button key={item.id} className={view === item.id ? "active" : ""} onClick={() => go(item.id)}>{item.label}</button>)}<div className="mobile-role-choice">{(["Agent", "Builder", "Client"] as Role[]).map(option => <button key={option} className={role === option ? "active" : ""} onClick={() => onRoleChange(option)}>{option} preview</button>)}</div></nav>}
     <div className="site-subnav"><span>REAL-ESTATE INTELLIGENCE</span><span>GLOBAL PLATFORM <b>·</b> {primary.find(item => item.id === view)?.label || secondary.find(item => item.id === view)?.label || "Overview"}</span><div>{secondary.map(item => <button key={item.id} className={view === item.id ? "active" : ""} onClick={() => go(item.id)}>{item.label}</button>)}</div></div>
     <section className="content site-content">{children}</section>
   </main>;

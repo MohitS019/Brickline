@@ -14,6 +14,7 @@ import { MarketplaceView } from "./views/marketplace-view";
 import { RadarView } from "./views/radar-view";
 import { AlertsView, type AlertItem } from "./views/alerts-view";
 import { ProfileView } from "./views/profile-view";
+import { ClientAccessView } from "./views/client-access-view";
 import type { Opportunity, Project, Role, ViewId } from "@/lib/brickline-data";
 
 const readStored = <T,>(key: string): T[] => {
@@ -49,7 +50,7 @@ export default function WorkspaceApp() {
       setOpportunities(readStored<Opportunity>("brickline-global-opportunities"));
       setAlerts(readStored<AlertItem>("brickline-global-alerts"));
       const savedRole = localStorage.getItem("brickline-global-role");
-      if (savedRole === "Agent" || savedRole === "Builder" || savedRole === "Buyer") setRole(savedRole);
+      if (savedRole === "Agent" || savedRole === "Builder" || savedRole === "Client") setRole(savedRole);
       setHydrated(true);
     }, 0);
     const key = (event: KeyboardEvent) => {
@@ -67,6 +68,8 @@ export default function WorkspaceApp() {
   useEffect(() => { if (hydrated) localStorage.setItem("brickline-global-role", role); }, [role, hydrated]);
 
   const navigate = (next: ViewId) => { setView(next); window.scrollTo({ top: 0, behavior: "smooth" }); };
+  const changeRole = (next: Role) => { setRole(next); setProjectId(null); setForm(null); navigate(next === "Agent" ? "map" : "client-access"); };
+  const requestProjectForm = () => { if (role === "Client") { navigate("client-access"); notify("Client panel is for browsing; project publishing belongs to builders."); } else setForm("project"); };
   const toggleSet = (setter: React.Dispatch<React.SetStateAction<Set<string>>>, id: string, added: string, removed: string) => {
     setter(previous => { const next = new Set(previous); if (next.has(id)) { next.delete(id); notify(removed); } else { next.add(id); notify(added); } return next; });
   };
@@ -91,18 +94,19 @@ export default function WorkspaceApp() {
 
   let content: React.ReactNode;
   switch (view) {
-    case "overview": content = <OverviewView role={role} items={projects} onNavigate={navigate} onAdd={() => setForm("project")}/>; break;
-    case "map": content = <MapView items={projects} onProject={setProjectId} onAdd={() => setForm("project")} onNavigate={navigate}/>; break;
-    case "projects": content = <ProjectsView items={projects} saved={savedProjects} onProject={setProjectId} onSave={id => toggleSet(setSavedProjects, id, "Project saved", "Project removed from saved")} onAdd={() => setForm("project")}/>; break;
-    case "network": content = <NetworkView items={projects} onProject={setProjectId} onAdd={() => setForm("project")}/>; break;
+    case "overview": content = <OverviewView role={role} items={projects} onNavigate={navigate} onAdd={requestProjectForm}/>; break;
+    case "map": content = <MapView items={projects} onProject={setProjectId} onAdd={requestProjectForm} onNavigate={navigate}/>; break;
+    case "projects": content = <ProjectsView items={projects} saved={savedProjects} onProject={setProjectId} onSave={id => toggleSet(setSavedProjects, id, "Project saved", "Project removed from saved")} onAdd={requestProjectForm}/>; break;
+    case "network": content = <NetworkView items={projects} role={role} onProject={setProjectId} onAdd={requestProjectForm}/>; break;
     case "areas": content = <AreasView items={projects} onProject={setProjectId} onWatch={area => { setFormArea(area); setForm("alert"); }} onMap={() => navigate("map")}/>; break;
     case "marketplace": content = <MarketplaceView items={opportunities} role={role} applied={applied} saved={savedOpps} onApply={id => toggleSet(setApplied, id, "Interest recorded", "Interest withdrawn")} onSave={id => toggleSet(setSavedOpps, id, "Opportunity saved", "Opportunity removed")} onPost={() => setForm("opportunity")}/>; break;
     case "radar": content = <RadarView following={following} onFollow={id => toggleSet(setFollowing, id, "Signal followed", "Signal unfollowed")} onProject={setProjectId} onCreateAlert={() => setForm("alert")}/>; break;
     case "alerts": content = <AlertsView items={alerts} onRead={id => setAlerts(current => current.map(alert => alert.id === id ? { ...alert, read: true } : alert))} onReadAll={() => setAlerts(current => current.map(alert => ({ ...alert, read: true })))} onDelete={id => setAlerts(current => current.filter(alert => alert.id !== id))} onProject={setProjectId} onSettings={() => navigate("profile")}/>; break;
-    case "profile": content = <ProfileView role={role} onRoleChange={setRole} onNotify={notify}/>; break;
+    case "profile": content = <ProfileView role={role} onRoleChange={changeRole} onNotify={notify}/>; break;
+    case "client-access": content = <ClientAccessView role={role} projects={projects} onNavigate={navigate}/>; break;
   }
 
-  return <><AppShell view={view} role={role} mobileOpen={mobileOpen} unread={alerts.filter(alert => !alert.read).length} onNavigate={navigate} onRoleChange={setRole} onMobileToggle={() => setMobileOpen(!mobileOpen)} onSearch={() => setSearchOpen(true)}>{content}</AppShell>
+  return <><AppShell view={view} role={role} mobileOpen={mobileOpen} unread={alerts.filter(alert => !alert.read).length} onNavigate={navigate} onRoleChange={changeRole} onMobileToggle={() => setMobileOpen(!mobileOpen)} onSearch={() => setSearchOpen(true)}>{content}</AppShell>
     {searchOpen && <GlobalSearch items={projects} query={query} setQuery={setQuery} onClose={() => { setSearchOpen(false); setQuery(""); }} onNavigate={navigate} onProject={setProjectId}/>}
     {projectId && <ProjectDetail id={projectId} items={projects} role={role} saved={savedProjects.has(projectId)} onClose={() => setProjectId(null)} onSave={() => toggleSet(setSavedProjects, projectId, "Project saved", "Project removed from saved")} onNotify={notify} onOpportunity={() => { setProjectId(null); navigate("marketplace"); }}/>}
     {form && <SimpleFormModal kind={form} recipient={form === "message" ? messageRecipient : ""} initialArea={formArea} onClose={() => { setForm(null); setMessageRecipient(""); setFormArea(""); }} onSubmit={handleForm}/>}
