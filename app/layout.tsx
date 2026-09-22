@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Brickline | Real estate intelligence",
-  description: "Development intelligence and opportunity network for builders and real-estate agents.",
+  title: "Brickline | Global real estate map",
+  description: "Explore real estate projects and opportunities on a worldwide map.",
   other: {
     "codex-preview": "development",
   },

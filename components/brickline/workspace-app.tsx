@@ -1,5 +1,6 @@
 "use client";
-import { useCallback, useEffect, useMemo, useState } from "react";
+
+import { useCallback, useEffect, useState } from "react";
 import { AppShell } from "./app-shell";
 import { GlobalSearch, Toast } from "./ui";
 import { ProjectDetail } from "./project-detail";
@@ -12,27 +13,92 @@ import { MarketplaceView } from "./views/marketplace-view";
 import { RadarView } from "./views/radar-view";
 import { AlertsView, type AlertItem } from "./views/alerts-view";
 import { ProfileView } from "./views/profile-view";
-import { opportunities, projects, type Opportunity, type Project, type Role, type ViewId } from "@/lib/brickline-data";
+import type { Opportunity, Project, Role, ViewId } from "@/lib/brickline-data";
 
-const initialAlerts:AlertItem[]=[
- {id:"a1",title:"Construction started at Aurelia Heights",body:"Foundation work and contractor mobilisation were verified in Bandra West.",time:"28 min ago",read:false,projectId:"aurelia"},
- {id:"a2",title:"New match: Exclusive channel partners",body:"Aurelia Developments matches your luxury buyer profile and coverage.",time:"2h ago",read:false},
- {id:"a3",title:"Approval advanced for Arden Park",body:"The Worli project moved to the next municipal review stage.",time:"Yesterday",read:false,projectId:"arden"},
- {id:"a4",title:"Weekly Mumbai market brief is ready",body:"12 new signals and ₹1,385 Cr in potential launch value were recorded.",time:"Monday",read:true},
-];
-const readStored=<T,>(key:string):T[]=>{try{return JSON.parse(localStorage.getItem(key)||"[]") as T[]}catch{return[]}};
+const readStored = <T,>(key: string): T[] => {
+  try { return JSON.parse(localStorage.getItem(key) || "[]") as T[]; }
+  catch { return []; }
+};
 
-export default function WorkspaceApp(){
- const [view,setView]=useState<ViewId>("overview"),[role,setRole]=useState<Role>("Agent"),[mobileOpen,setMobileOpen]=useState(false),[searchOpen,setSearchOpen]=useState(false),[query,setQuery]=useState(""),[projectId,setProjectId]=useState<string|null>(null),[toast,setToast]=useState(""),[brief,setBrief]=useState(false),[form,setForm]=useState<FormKind|null>(null),[messageRecipient,setMessageRecipient]=useState("");
- const [customProjects,setCustomProjects]=useState<Project[]>([]),[customOpportunities,setCustomOpportunities]=useState<Opportunity[]>([]),[hydrated,setHydrated]=useState(false);
- const [savedProjects,setSavedProjects]=useState(new Set<string>()),[connections,setConnections]=useState(new Set<string>()),[savedOpps,setSavedOpps]=useState(new Set<string>()),[applied,setApplied]=useState(new Set<string>()),[following,setFollowing]=useState(new Set<string>()),[alerts,setAlerts]=useState(initialAlerts);
- const projectItems=useMemo(()=>[...customProjects,...projects],[customProjects]); const opportunityItems=useMemo(()=>[...customOpportunities,...opportunities],[customOpportunities]);
- const notify=useCallback((m:string)=>setToast(m),[]); const toggleSet=(setter:React.Dispatch<React.SetStateAction<Set<string>>>,id:string,message:string)=>setter(prev=>{const next=new Set(prev);next.has(id)?next.delete(id):next.add(id);notify(message);return next});
- useEffect(()=>{setCustomProjects(readStored<Project>("brickline-projects"));setCustomOpportunities(readStored<Opportunity>("brickline-opportunities"));setHydrated(true);const key=(e:KeyboardEvent)=>{if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==="k"){e.preventDefault();setSearchOpen(true)}};window.addEventListener("keydown",key);return()=>window.removeEventListener("keydown",key)},[]);
- useEffect(()=>{if(hydrated)localStorage.setItem("brickline-projects",JSON.stringify(customProjects))},[customProjects,hydrated]);
- useEffect(()=>{if(hydrated)localStorage.setItem("brickline-opportunities",JSON.stringify(customOpportunities))},[customOpportunities,hydrated]);
- const navigate=(v:ViewId)=>{setView(v);window.scrollTo({top:0,behavior:"smooth"})}; const openProject=(id:string)=>setProjectId(id);
- const handleForm=(result:FormResult)=>{const id=`user-${Date.now()}`;if(result.kind==="project"){const created:Project={id,name:result.name,area:result.area,siteAddress:result.siteAddress||undefined,status:result.status,builder:result.builder,value:result.value,homes:result.homes,completion:"Not scheduled",confidence:100,updated:"Just added",description:result.notes,tags:["Added by you"],coordinates:{x:50,y:50}};setCustomProjects(v=>[created,...v]);setView("projects");setProjectId(id);notify("Project added and saved on this device")}else if(result.kind==="opportunity"){const created:Opportunity={id,title:result.name,builder:result.builder,area:result.area,type:"Partner mandate",commission:result.commission,deadline:"Open",matches:0,description:result.notes};setCustomOpportunities(v=>[created,...v]);setView("marketplace");notify("Opportunity published in your workspace")}else if(result.kind==="alert"){setAlerts(v=>[{id,title:result.name,body:`Watching ${result.area}: ${result.notes}`,time:"Just now",read:false},...v]);setView("alerts");notify("Radar alert created")}else notify(`Message sent to ${result.name}`)};
- const content=()=>{switch(view){case"map":return <MapView items={projectItems} onProject={openProject} onNotify={notify}/>;case"projects":return <ProjectsView items={projectItems} saved={savedProjects} onProject={openProject} onSave={id=>toggleSet(setSavedProjects,id,savedProjects.has(id)?"Project removed from saved":"Project saved")} onAdd={()=>setForm("project")}/>;case"network":return <NetworkView role={role} connected={connections} onConnect={id=>toggleSet(setConnections,id,connections.has(id)?"Connection removed":"Connection added")} onMessage={name=>{setMessageRecipient(name);setForm("message")}}/>;case"marketplace":return <MarketplaceView items={opportunityItems} role={role} applied={applied} saved={savedOpps} onApply={id=>toggleSet(setApplied,id,applied.has(id)?"Application withdrawn":"Interest sent to the builder")} onSave={id=>toggleSet(setSavedOpps,id,savedOpps.has(id)?"Opportunity removed":"Opportunity saved")} onPost={()=>setForm("opportunity")}/>;case"radar":return <RadarView following={following} onFollow={id=>toggleSet(setFollowing,id,following.has(id)?"Signal unfollowed":"Signal added to your watchlist")} onProject={openProject} onCreateAlert={()=>setForm("alert")}/>;case"alerts":return <AlertsView items={alerts} onRead={id=>setAlerts(a=>a.map(x=>x.id===id?{...x,read:true}:x))} onReadAll={()=>{setAlerts(a=>a.map(x=>({...x,read:true})));notify("All alerts marked as read")}} onDelete={id=>{setAlerts(a=>a.filter(x=>x.id!==id));notify("Alert removed")}} onProject={openProject} onSettings={()=>navigate("profile")}/>;case"profile":return <ProfileView role={role} onRoleChange={r=>{setRole(r);notify(`Switched to ${r} workspace`)}} onNotify={notify}/>;default:return <OverviewView role={role} brief={brief} onBrief={()=>{setBrief(!brief);notify(brief?"Weekly brief paused":"Weekly brief subscribed")}} onNavigate={navigate} onProject={openProject} onNotify={notify}/>}}
- return <><AppShell view={view} role={role} mobileOpen={mobileOpen} unread={alerts.filter(a=>!a.read).length} onNavigate={navigate} onRoleChange={r=>{setRole(r);notify(`Switched to ${r} workspace`)}} onMobileToggle={()=>setMobileOpen(!mobileOpen)} onSearch={()=>setSearchOpen(true)}>{content()}</AppShell>{searchOpen&&<GlobalSearch items={projectItems} query={query} setQuery={setQuery} onClose={()=>{setSearchOpen(false);setQuery("")}} onNavigate={navigate} onProject={openProject}/>} {projectId&&<ProjectDetail id={projectId} items={projectItems} role={role} saved={savedProjects.has(projectId)} onClose={()=>setProjectId(null)} onSave={()=>toggleSet(setSavedProjects,projectId,savedProjects.has(projectId)?"Project removed from saved":"Project saved")} onNotify={notify} onOpportunity={()=>{setProjectId(null);navigate("marketplace")}}/>}{form&&<SimpleFormModal kind={form} recipient={form==="message"?messageRecipient:""} onClose={()=>{setForm(null);setMessageRecipient("")}} onSubmit={handleForm}/>} {toast&&<Toast message={toast} onClose={()=>setToast("")}/>}</>
+export default function WorkspaceApp() {
+  const [view, setView] = useState<ViewId>("map");
+  const [role, setRole] = useState<Role>("Agent");
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [projectId, setProjectId] = useState<string | null>(null);
+  const [toast, setToast] = useState("");
+  const [form, setForm] = useState<FormKind | null>(null);
+  const [messageRecipient, setMessageRecipient] = useState("");
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
+  const [hydrated, setHydrated] = useState(false);
+  const [savedProjects, setSavedProjects] = useState(new Set<string>());
+  const [connections, setConnections] = useState(new Set<string>());
+  const [savedOpps, setSavedOpps] = useState(new Set<string>());
+  const [applied, setApplied] = useState(new Set<string>());
+  const [following, setFollowing] = useState(new Set<string>());
+  const [alerts, setAlerts] = useState<AlertItem[]>([]);
+  const notify = useCallback((message: string) => setToast(message), []);
+
+  useEffect(() => {
+    // Keep old India-workspace records recoverable under their original keys.
+    const load = window.setTimeout(() => {
+      setProjects(readStored<Project>("brickline-global-projects"));
+      setOpportunities(readStored<Opportunity>("brickline-global-opportunities"));
+      setHydrated(true);
+    }, 0);
+    const key = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setSearchOpen(true);
+      }
+    };
+    window.addEventListener("keydown", key);
+    return () => { window.clearTimeout(load); window.removeEventListener("keydown", key); };
+  }, []);
+  useEffect(() => { if (hydrated) localStorage.setItem("brickline-global-projects", JSON.stringify(projects)); }, [projects, hydrated]);
+  useEffect(() => { if (hydrated) localStorage.setItem("brickline-global-opportunities", JSON.stringify(opportunities)); }, [opportunities, hydrated]);
+
+  const navigate = (next: ViewId) => { setView(next); window.scrollTo({ top: 0, behavior: "smooth" }); };
+  const toggleSet = (setter: React.Dispatch<React.SetStateAction<Set<string>>>, id: string, added: string, removed: string) => {
+    setter(previous => { const next = new Set(previous); if (next.has(id)) { next.delete(id); notify(removed); } else { next.add(id); notify(added); } return next; });
+  };
+  const handleForm = (result: FormResult) => {
+    const id = `user-${Date.now()}`;
+    if (result.kind === "project") {
+      const created: Project = { id, name: result.name, area: result.area, country: result.country, siteAddress: result.siteAddress || undefined, currency: result.currency, status: result.status, builder: result.builder, value: result.value, homes: result.homes, completion: "Not scheduled", confidence: 100, updated: "Just added", description: result.notes, tags: ["Added by you"], coordinates: { x: 50, y: 50 } };
+      setProjects(current => [created, ...current]);
+      navigate("map");
+      setProjectId(id);
+      notify("Project added to this device's global workspace");
+    } else if (result.kind === "opportunity") {
+      setOpportunities(current => [{ id, title: result.name, builder: result.builder, area: [result.area, result.country].filter(Boolean).join(", "), type: "Partner mandate", commission: result.commission, deadline: "Open", matches: 0, description: result.notes }, ...current]);
+      navigate("marketplace");
+      notify("Opportunity saved in this workspace");
+    } else if (result.kind === "alert") {
+      setAlerts(current => [{ id, title: result.name, body: `Watching ${[result.area, result.country].filter(Boolean).join(", ")}: ${result.notes}`, time: "Just now", read: false }, ...current]);
+      navigate("alerts");
+      notify("Radar alert created");
+    } else notify(`Message prepared for ${result.name}`);
+  };
+
+  let content: React.ReactNode;
+  switch (view) {
+    case "overview": content = <OverviewView role={role} items={projects} onNavigate={navigate} onAdd={() => setForm("project")}/>; break;
+    case "map": content = <MapView items={projects} onProject={setProjectId} onAdd={() => setForm("project")}/>; break;
+    case "projects": content = <ProjectsView items={projects} saved={savedProjects} onProject={setProjectId} onSave={id => toggleSet(setSavedProjects, id, "Project saved", "Project removed from saved")} onAdd={() => setForm("project")}/>; break;
+    case "network": content = <NetworkView role={role} connected={connections} onConnect={id => toggleSet(setConnections, id, "Connection added", "Connection removed")} onMessage={name => { setMessageRecipient(name); setForm("message"); }}/>; break;
+    case "marketplace": content = <MarketplaceView items={opportunities} role={role} applied={applied} saved={savedOpps} onApply={id => toggleSet(setApplied, id, "Interest recorded", "Interest withdrawn")} onSave={id => toggleSet(setSavedOpps, id, "Opportunity saved", "Opportunity removed")} onPost={() => setForm("opportunity")}/>; break;
+    case "radar": content = <RadarView following={following} onFollow={id => toggleSet(setFollowing, id, "Signal followed", "Signal unfollowed")} onProject={setProjectId} onCreateAlert={() => setForm("alert")}/>; break;
+    case "alerts": content = <AlertsView items={alerts} onRead={id => setAlerts(current => current.map(alert => alert.id === id ? { ...alert, read: true } : alert))} onReadAll={() => setAlerts(current => current.map(alert => ({ ...alert, read: true })))} onDelete={id => setAlerts(current => current.filter(alert => alert.id !== id))} onProject={setProjectId} onSettings={() => navigate("profile")}/>; break;
+    case "profile": content = <ProfileView role={role} onRoleChange={setRole} onNotify={notify}/>; break;
+  }
+
+  return <><AppShell view={view} role={role} mobileOpen={mobileOpen} unread={alerts.filter(alert => !alert.read).length} onNavigate={navigate} onRoleChange={setRole} onMobileToggle={() => setMobileOpen(!mobileOpen)} onSearch={() => setSearchOpen(true)}>{content}</AppShell>
+    {searchOpen && <GlobalSearch items={projects} query={query} setQuery={setQuery} onClose={() => { setSearchOpen(false); setQuery(""); }} onNavigate={navigate} onProject={setProjectId}/>}
+    {projectId && <ProjectDetail id={projectId} items={projects} role={role} saved={savedProjects.has(projectId)} onClose={() => setProjectId(null)} onSave={() => toggleSet(setSavedProjects, projectId, "Project saved", "Project removed from saved")} onNotify={notify} onOpportunity={() => { setProjectId(null); navigate("marketplace"); }}/>}
+    {form && <SimpleFormModal kind={form} recipient={form === "message" ? messageRecipient : ""} onClose={() => { setForm(null); setMessageRecipient(""); }} onSubmit={handleForm}/>}
+    {toast && <Toast message={toast} onClose={() => setToast("")}/>}
+  </>;
 }

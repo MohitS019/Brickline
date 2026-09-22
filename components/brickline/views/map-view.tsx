@@ -1,30 +1,41 @@
 "use client";
-import { useMemo, useState } from "react";
-import { Building2, Check, LocateFixed, Map, MapPin, Search, SlidersHorizontal } from "lucide-react";
-import { statusColor, type Project, type ProjectStatus } from "@/lib/brickline-data";
-import { projectMapLocation } from "@/lib/project-map";
-import { findRegionForArea, indiaRegions } from "@/lib/india-areas";
-import { EmptyState, PageHeader } from "../ui";
 
-const statuses:ProjectStatus[]=["New construction","Redevelopment","Approval stage","Construction started"];
-export function MapView({items,onProject,onNotify}:{items:Project[];onProject:(id:string)=>void;onNotify:(m:string)=>void}){
- const [query,setQuery]=useState(""),[selected,setSelected]=useState("All India"),[enabled,setEnabled]=useState<ProjectStatus[]>(statuses),[mapMode,setMapMode]=useState<"google"|"coverage">("google"),[focusedProjectId,setFocusedProjectId]=useState<string|null>(null);
- const regionResults=useMemo(()=>indiaRegions.filter(region=>`${region.name} ${region.capital} ${region.cities.join(" ")}`.toLowerCase().includes(query.toLowerCase())),[query]);
- const visibleProjects=useMemo(()=>items.filter(project=>{const region=findRegionForArea(project.area);return enabled.includes(project.status)&&(selected==="All India"||region?.name===selected||project.area.includes(selected))&&`${project.name} ${project.area} ${project.builder}`.toLowerCase().includes(query.toLowerCase())}),[items,enabled,selected,query]);
- const activeRegion=selected==="All India"?null:indiaRegions.find(region=>region.name===selected); const toggle=(s:ProjectStatus)=>setEnabled(v=>v.includes(s)?v.filter(x=>x!==s):[...v,s]); const focusedProject=items.find(project=>project.id===focusedProjectId); const mapQuery=query.trim()||activeRegion?.capital||activeRegion?.name||"India"; const embedUrl=focusedProject?projectMapLocation(focusedProject).embedUrl:`https://maps.google.com/maps?q=${encodeURIComponent(`${mapQuery}, India`)}&z=${activeRegion||query?7:5}&output=embed`;
- return <div className="page map-page"><PageHeader eyebrow="INDIA DEVELOPMENT MAP" title="Development activity across India" description="Explore every state and union territory, then drill into major cities and active projects." actions={<button className="button secondary" onClick={()=>{setSelected("Maharashtra");setQuery("");onNotify("Map centered on Maharashtra")} }><LocateFixed size={16}/>My territory</button>}/>
-  <section className="india-map-workspace"><aside className="india-map-sidebar"><div className="search-field"><Search size={17}/><input value={query} onChange={e=>{setQuery(e.target.value);setFocusedProjectId(null)}} placeholder="Search state, city or project"/></div><div className="coverage-total"><b>36</b><span>states and union territories</span><small>{indiaRegions.reduce((sum,region)=>sum+region.cities.length,0)} major cities available</small></div><div className="filter-title"><span>DEVELOPMENT STAGE</span><SlidersHorizontal size={15}/></div>{statuses.map(s=><button className="check-row" key={s} onClick={()=>toggle(s)}><span className={enabled.includes(s)?"checkbox checked":"checkbox"}>{enabled.includes(s)&&<Check size={13}/>}</span><i style={{background:statusColor[s]}}/>{s}<b>{items.filter(p=>p.status===s).length}</b></button>)}<div className="filter-title"><span>AREAS</span><b>{regionResults.length}</b></div><div className="region-list"><button className={selected==="All India"?"active":""} onClick={()=>{setSelected("All India");setFocusedProjectId(null)}}><span className="region-code">IN</span><span><b>All India</b><small>National coverage</small></span></button>{regionResults.map(region=><button className={selected===region.name?"active":""} key={region.code} onClick={()=>{setSelected(region.name);setFocusedProjectId(null)}}><span className="region-code">{region.code}</span><span><b>{region.name}</b><small>{region.type} · {region.cities.length} cities</small></span></button>)}</div></aside>
-   <div className="india-map-main">
-    <div className="map-provider-bar">
-     <div className="map-mode-toggle">
-      <button className={mapMode==="google"?"active":""} onClick={()=>setMapMode("google")}><MapPin size={15}/>Google Maps</button>
-      <button className={mapMode==="coverage"?"active":""} onClick={()=>setMapMode("coverage")}><Map size={15}/>Coverage view</button>
-     </div>
-     <span className="map-context">{focusedProject ? `Showing ${focusedProject.siteAddress ? "site" : "area"}: ${focusedProject.name}` : "Map stays inside Brickline"}</span>
-    </div>
-    {mapMode==="google"?<div className="google-map-frame"><iframe key={embedUrl} title={`Google Map of ${focusedProject?.name||mapQuery}`} src={embedUrl} loading="lazy" referrerPolicy="no-referrer-when-downgrade" allowFullScreen/></div>:<div className="india-map-canvas"><div className="india-silhouette"/>{indiaRegions.map(region=><button title={`${region.name} — ${region.capital}`} aria-label={region.name} className={`${selected===region.name?"india-region-dot active":"india-region-dot"}${region.type==="Union Territory"?" ut":""}`} style={{left:`${region.x}%`,top:`${region.y}%`}} key={region.code} onClick={()=>{setSelected(region.name);setFocusedProjectId(null)}}><span>{region.code}</span></button>)}<div className="india-map-key"><span><i className="state-key"/>State</span><span><i className="ut-key"/>Union territory</span></div></div>}
-    <section className="region-detail"><div className="region-detail-head"><div><span className="eyebrow">{activeRegion?.type.toUpperCase()||"NATIONAL COVERAGE"}</span><h2>{activeRegion?.name||"All India"}</h2><p>{activeRegion?`Capital: ${activeRegion.capital}`:"Select any area to view cities and projects."}</p></div><span className="project-count"><Building2 size={17}/><b>{visibleProjects.length}</b> projects</span></div>{activeRegion&&<div className="city-chips">{activeRegion.cities.map(city=><button key={city} onClick={()=>{setQuery(city);setFocusedProjectId(null);setMapMode("google")}}><MapPin size={12}/>{city}</button>)}</div>}<div className="india-project-results">{visibleProjects.map(project=><button key={project.id} onClick={()=>{setFocusedProjectId(project.id);setMapMode("google");onProject(project.id)}}><span className="project-result-icon" style={{background:statusColor[project.status]}}><Building2 size={17}/></span><span><b>{project.name}</b><small>{project.area} · {project.builder}</small></span><span className="status-pill"><i style={{background:statusColor[project.status]}}/>{project.status}</span></button>)}{!visibleProjects.length&&<EmptyState title="No active projects in this view" body="The area remains available for monitoring. Add a project or choose another region."/>}</div></section>
-   </div>
-  </section>
- </div>
+import { FormEvent, useMemo, useState } from "react";
+import { Building2, Globe2, MapPin, Plus, Search, X } from "lucide-react";
+import { googleMapEmbed, projectMapLocation } from "@/lib/project-map";
+import type { Project } from "@/lib/brickline-data";
+import { WorldAtlas, worldCountryNames } from "../world-atlas";
+import { PageHeader } from "../ui";
+
+export function MapView({ items, onProject, onAdd }: { items: Project[]; onProject: (id: string) => void; onAdd: () => void }) {
+  const [draft, setDraft] = useState("");
+  const [place, setPlace] = useState("World");
+  const [focusedId, setFocusedId] = useState<string | null>(null);
+  const [mode, setMode] = useState<"atlas" | "google">("atlas");
+  const [selectedCountry, setSelectedCountry] = useState("");
+  const focusedProject = items.find(item => item.id === focusedId);
+  const mapUrl = focusedProject ? projectMapLocation(focusedProject).embedUrl : googleMapEmbed(place, place === "World" ? 2 : 11);
+  const matchingProjects = useMemo(() => items.filter(item => `${item.name} ${item.area} ${item.country || ""} ${item.builder}`.toLowerCase().includes(draft.toLowerCase())), [items, draft]);
+  const search = (event: FormEvent) => {
+    event.preventDefault();
+    setFocusedId(null);
+    const next = draft.trim() || "World";
+    setPlace(next);
+    const country = worldCountryNames.find(name => name.toLowerCase() === next.toLowerCase());
+    setSelectedCountry(country || "");
+    setMode(country || next === "World" ? "atlas" : "google");
+  };
+
+  return <div className="page global-map-page">
+    <PageHeader eyebrow="GLOBAL DEVELOPMENT MAP" title="Explore real estate worldwide" description="Search any country, city, neighbourhood or project. Your map stays inside Brickline." actions={<button className="button primary" onClick={onAdd}><Plus size={16}/>Add project</button>}/>
+    <section className="world-map-shell" aria-label="Global development map">
+      <div className="world-map-toolbar">
+        <form className="world-map-search" onSubmit={search}><Search size={18}/><input value={draft} onChange={event => setDraft(event.target.value)} placeholder="Search country or city worldwide" aria-label="Search country or city worldwide"/><button type="submit">Search map</button></form>
+        <button className="world-reset" onClick={() => { setDraft(""); setPlace("World"); setFocusedId(null); setSelectedCountry(""); setMode("atlas"); }}><Globe2 size={17}/>Full world map</button>
+      </div>
+      <div className="world-map-frame">{mode === "atlas" && !focusedProject ? <WorldAtlas selected={selectedCountry} onCountry={country => { setSelectedCountry(country); setPlace(country); setDraft(country); }}/> : <iframe key={mapUrl} title={`Google map of ${focusedProject?.name || place}`} src={mapUrl} loading="eager" referrerPolicy="no-referrer-when-downgrade" allowFullScreen/>}</div>
+      <div className="world-map-footer"><span><MapPin size={15}/>{focusedProject ? `Project location: ${focusedProject.name}` : place === "World" ? "World view" : `Exploring ${place}`}</span>{focusedProject && <button onClick={() => { setFocusedId(null); setMode("atlas"); }}><X size={14}/>Clear project</button>}{mode === "atlas" && place !== "World" && <button onClick={() => setMode("google")}>Street map</button>}{mode === "google" && !focusedProject && <button onClick={() => setMode("atlas")}>World map</button>}<small>{items.length} projects in this workspace</small></div>
+    </section>
+    <section className="world-projects"><div><h2>Projects on Brickline</h2><p>{items.length ? "Choose a project to focus its location on the map." : "No projects have been added yet. Add the first project anywhere in the world."}</p></div>{items.length ? <div className="world-project-list">{matchingProjects.map(project => <button key={project.id} onClick={() => { setFocusedId(project.id); setMode("google"); onProject(project.id); }}><Building2 size={17}/><span><b>{project.name}</b><small>{[project.area, project.country].filter(Boolean).join(", ")} · {project.builder}</small></span><MapPin size={16}/></button>)}{!matchingProjects.length && <p>No projects match this search.</p>}</div> : <button className="button secondary" onClick={onAdd}><Plus size={16}/>Add first project</button>}</section>
+  </div>;
 }
