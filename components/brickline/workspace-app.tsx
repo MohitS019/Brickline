@@ -15,6 +15,8 @@ import { RadarView } from "./views/radar-view";
 import { AlertsView, type AlertItem } from "./views/alerts-view";
 import { ProfileView } from "./views/profile-view";
 import { ClientAccessView } from "./views/client-access-view";
+import { BuilderApprovalGate } from "./builder-approval";
+import type { BuilderAccess } from "@/lib/builder-access";
 import type { Opportunity, Project, Role, ViewId } from "@/lib/brickline-data";
 
 const readStored = <T,>(key: string): T[] => {
@@ -22,7 +24,7 @@ const readStored = <T,>(key: string): T[] => {
   catch { return []; }
 };
 
-export default function WorkspaceApp() {
+export default function WorkspaceApp({ builderAccess }: { builderAccess: BuilderAccess }) {
   const [view, setView] = useState<ViewId>("map");
   const [role, setRole] = useState<Role>("Agent");
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -92,6 +94,9 @@ export default function WorkspaceApp() {
     } else notify(`Message prepared for ${result.name}`);
   };
 
+  if (!hydrated && builderAccess.mode !== "preview") return <div className="approval-shell"><div className="approval-brand">Brick<span>line.</span></div></div>;
+  if (role === "Builder" && builderAccess.mode !== "preview" && !builderAccess.isAdmin && builderAccess.status !== "approved") return <BuilderApprovalGate access={builderAccess}/>;
+
   let content: React.ReactNode;
   switch (view) {
     case "overview": content = <OverviewView role={role} items={projects} onNavigate={navigate} onAdd={requestProjectForm}/>; break;
@@ -103,7 +108,7 @@ export default function WorkspaceApp() {
     case "radar": content = <RadarView following={following} onFollow={id => toggleSet(setFollowing, id, "Signal followed", "Signal unfollowed")} onProject={setProjectId} onCreateAlert={() => setForm("alert")}/>; break;
     case "alerts": content = <AlertsView items={alerts} onRead={id => setAlerts(current => current.map(alert => alert.id === id ? { ...alert, read: true } : alert))} onReadAll={() => setAlerts(current => current.map(alert => ({ ...alert, read: true })))} onDelete={id => setAlerts(current => current.filter(alert => alert.id !== id))} onProject={setProjectId} onSettings={() => navigate("profile")}/>; break;
     case "profile": content = <ProfileView role={role} onRoleChange={changeRole} onNotify={notify}/>; break;
-    case "client-access": content = <ClientAccessView role={role} projects={projects} onNavigate={navigate}/>; break;
+    case "client-access": content = <ClientAccessView role={role} projects={projects} isAdmin={builderAccess.isAdmin} builderApproved={builderAccess.mode === "member" && builderAccess.status === "approved"} onNavigate={navigate}/>; break;
   }
 
   return <><AppShell view={view} role={role} mobileOpen={mobileOpen} unread={alerts.filter(alert => !alert.read).length} onNavigate={navigate} onRoleChange={changeRole} onMobileToggle={() => setMobileOpen(!mobileOpen)} onSearch={() => setSearchOpen(true)}>{content}</AppShell>
