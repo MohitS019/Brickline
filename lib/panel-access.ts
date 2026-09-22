@@ -4,7 +4,7 @@ import type { Role } from "@/lib/brickline-data";
 
 export type AccessStatus = "pending" | "approved" | "declined" | "suspended" | null;
 export type PanelAccess = {
-  mode: "preview" | "signed-out" | "unavailable" | "member";
+  mode: "signed-out" | "unavailable" | "member";
   isAdmin: boolean;
   status: AccessStatus;
   requestedRole: Role | null;
@@ -14,7 +14,7 @@ export type PanelAccess = {
 
 export function isBricklineAdmin(user: ChatGPTUser): boolean {
   const configured = (env as { BRICKLINE_ADMIN_EMAIL?: string }).BRICKLINE_ADMIN_EMAIL;
-  return Boolean(configured && user.email.toLowerCase() === configured.toLowerCase());
+  return Boolean(configured?.trim() && user.userId && user.email.trim().toLowerCase() === configured.trim().toLowerCase());
 }
 
 export function getPanelDb(): D1Database | null {
@@ -23,9 +23,7 @@ export function getPanelDb(): D1Database | null {
 
 export async function getPanelAccess(): Promise<PanelAccess> {
   const user = await getChatGPTUser();
-  if (!user) return process.env.NODE_ENV === "development"
-    ? { mode: "preview", isAdmin: true, status: "approved", requestedRole: null, allowedRoles: ["Agent", "Builder", "Client"], email: null }
-    : { mode: "signed-out", isAdmin: false, status: null, requestedRole: null, allowedRoles: [], email: null };
+  if (!user) return { mode: "signed-out", isAdmin: false, status: null, requestedRole: null, allowedRoles: [], email: null };
   if (isBricklineAdmin(user)) return { mode: "member", isAdmin: true, status: "approved", requestedRole: null, allowedRoles: ["Agent", "Builder", "Client"], email: user.email };
   const db = getPanelDb();
   if (!db) return { mode: "unavailable", isAdmin: false, status: null, requestedRole: null, allowedRoles: [], email: user.email };
