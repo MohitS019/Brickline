@@ -14,7 +14,8 @@ export type PanelAccess = {
 
 export function isBricklineAdmin(user: ChatGPTUser): boolean {
   const configured = (env as { BRICKLINE_ADMIN_EMAIL?: string }).BRICKLINE_ADMIN_EMAIL;
-  return Boolean(configured?.trim() && user.userId && user.email.trim().toLowerCase() === configured.trim().toLowerCase());
+  const email = user.email.trim().toLowerCase();
+  return Boolean(user.userId && email && configured?.split(",").some(allowed => allowed.trim().toLowerCase() === email));
 }
 
 export function getPanelDb(): D1Database | null {
