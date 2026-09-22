@@ -4,6 +4,7 @@ export type ProjectStatus = "New construction" | "Redevelopment" | "Approval sta
 
 export interface Project {
   id: string; name: string; area: string; status: ProjectStatus; builder: string;
+  siteAddress?: string;
   value: number; homes: number; completion: string; confidence: number; updated: string;
   description: string; tags: string[]; coordinates: { x: number; y: number };
 }
