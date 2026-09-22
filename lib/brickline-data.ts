@@ -3,7 +3,7 @@ export type ViewId = "overview" | "map" | "projects" | "network" | "areas" | "ma
 export type ProjectStatus = "New construction" | "Redevelopment" | "Approval stage" | "Construction started";
 
 export interface Project {
-  id: string; name: string; area: string; country?: string; siteAddress?: string; currency?: string;
+  id: string; name: string; area: string; country?: string; siteAddress?: string; currency?: string; reraNumber?: string;
   status: ProjectStatus; builder: string; value: number; homes: number; completion: string;
   confidence: number; updated: string; description: string; tags: string[];
   coordinates: { x: number; y: number };

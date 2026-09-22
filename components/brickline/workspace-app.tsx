@@ -84,7 +84,7 @@ export default function WorkspaceApp({ panelAccess, panelContent: initialPanelCo
   const handleForm = (result: FormResult) => {
     const id = `user-${Date.now()}`;
     if (result.kind === "project") {
-      const created: Project = { id, name: result.name, area: result.area, country: result.country, siteAddress: result.siteAddress || undefined, currency: result.currency, status: result.status, builder: result.builder, value: result.value, homes: result.homes, completion: "Not scheduled", confidence: 100, updated: "Just added", description: result.notes, tags: ["Added by you"], coordinates: { x: 50, y: 50 } };
+      const created: Project = { id, name: result.name, area: result.area, country: result.country, siteAddress: result.siteAddress || undefined, reraNumber: result.reraNumber || undefined, currency: result.currency, status: result.status, builder: result.builder, value: result.value, homes: result.homes, completion: "Not scheduled", confidence: 100, updated: "Just added", description: result.notes, tags: ["Added by you"], coordinates: { x: 50, y: 50 } };
       setProjects(current => [created, ...current]);
       navigate("map");
       setProjectId(id);

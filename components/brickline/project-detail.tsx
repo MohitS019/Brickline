@@ -49,6 +49,7 @@ export function ProjectDetail({ id, items, saved, onClose, onSave, onOpportunity
       </section>
 
       <section className="detail-section"><h3>Project summary</h3><p>{project.description}</p><div className="tag-row">{project.tags.map(tag => <span key={tag}>{tag}</span>)}</div></section>
+      {project.reraNumber && <section className="detail-section"><h3>RERA registration</h3><p>{project.reraNumber}</p><small>Builder-provided number · not independently verified by Brickline</small></section>}
       <section className="detail-facts">
         <div><Building2 size={18}/><span><small>Est. value</small><b>{project.currency || "USD"} {project.value.toLocaleString()}</b></span></div>
         <div><Users size={18}/><span><small>Inventory</small><b>{project.homes} homes</b></span></div>
