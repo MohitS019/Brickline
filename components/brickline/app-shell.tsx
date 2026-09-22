@@ -1,26 +1,50 @@
 "use client";
-import { ReactNode } from "react";
-import { Bell, Building2, ChevronDown, Compass, Handshake, Map, Menu, Radio, Search, UserRound, Users, X } from "lucide-react";
+
+import type { ReactNode } from "react";
+import { Bell, Menu, Search, UserRound, X } from "lucide-react";
 import type { Role, ViewId } from "@/lib/brickline-data";
 
-const navigation: {id:ViewId;label:string;icon:typeof Compass}[] = [
-  {id:"map",label:"World map",icon:Map},{id:"overview",label:"Overview",icon:Compass},
-  {id:"projects",label:"Projects",icon:Building2},{id:"network",label:"Network",icon:Users},
-  {id:"marketplace",label:"Opportunities",icon:Handshake},{id:"radar",label:"Radar",icon:Radio},
+const primary: { id: ViewId; label: string }[] = [
+  { id: "map", label: "Explore map" },
+  { id: "projects", label: "Projects" },
+  { id: "network", label: "Builders" },
+  { id: "areas", label: "Areas" },
+  { id: "radar", label: "Insights" },
+];
+const secondary: { id: ViewId; label: string }[] = [
+  { id: "marketplace", label: "Opportunities" },
+  { id: "alerts", label: "Alerts" },
+  { id: "profile", label: "Profile" },
 ];
 
-interface Props { children:ReactNode; view:ViewId; role:Role; mobileOpen:boolean; unread:number; onNavigate:(v:ViewId)=>void; onRoleChange:(r:Role)=>void; onMobileToggle:()=>void; onSearch:()=>void; }
+interface Props {
+  children: ReactNode;
+  view: ViewId;
+  role: Role;
+  mobileOpen: boolean;
+  unread: number;
+  onNavigate: (view: ViewId) => void;
+  onRoleChange: (role: Role) => void;
+  onMobileToggle: () => void;
+  onSearch: () => void;
+}
 
-export function AppShell({children,view,role,mobileOpen,unread,onNavigate,onRoleChange,onMobileToggle,onSearch}:Props){
-  const go=(id:ViewId)=>{onNavigate(id); if(mobileOpen) onMobileToggle()};
-  return <main className="app-shell">
-    <aside className={mobileOpen?"sidebar mobile-open":"sidebar"}>
-      <div className="brand-row"><button className="brand" onClick={()=>go("map")} aria-label="Brickline world map"><span className="brand-mark">B</span><span>BRICKLINE</span></button><button className="close-mobile" onClick={onMobileToggle} aria-label="Close menu"><X size={20}/></button></div>
-      <div className="workspace-switcher"><span>WORKSPACE</span><div className="role-segment"><button className={role==="Agent"?"selected":""} onClick={()=>onRoleChange("Agent")}>Agent</button><button className={role==="Builder"?"selected":""} onClick={()=>onRoleChange("Builder")}>Builder</button></div></div>
-      <nav className="main-nav" aria-label="Main navigation">{navigation.map(({id,label,icon:Icon})=><button key={id} className={view===id?"nav-item active":"nav-item"} onClick={()=>go(id)}><Icon size={18}/><span>{label}</span></button>)}</nav>
-      <div className="sidebar-bottom"><button className={view==="alerts"?"nav-item active":"nav-item"} onClick={()=>go("alerts")}><Bell size={18}/><span>Alerts</span>{unread>0&&<i>{unread}</i>}</button><button className={view==="profile"?"user-card active":"user-card"} onClick={()=>go("profile")}><span className="avatar"><UserRound size={16}/></span><span><strong>Your workspace</strong><small>{role} mode</small></span><ChevronDown size={15}/></button></div>
-    </aside>
-    {mobileOpen&&<button className="backdrop" onClick={onMobileToggle} aria-label="Close menu"/>}
-    <section className="content"><header className="topbar"><button className="mobile-menu" onClick={onMobileToggle} aria-label="Open menu"><Menu size={22}/></button><div className="location"><span className="status-pulse"/>Global platform <span>/</span><b>{navigation.find(x=>x.id===view)?.label ?? (view==="alerts"?"Alerts":"Profile")}</b></div><div className="top-actions"><button className="global-search" onClick={onSearch}><Search size={17}/><span>Search workspace</span><kbd>⌘ K</kbd></button><button className="icon-button" onClick={()=>go("alerts")} aria-label="Open alerts"><Bell size={18}/>{unread>0&&<i/>}</button><button className="avatar-button" onClick={()=>go("profile")} aria-label="Open profile"><UserRound size={17}/></button></div></header>{children}</section>
-  </main>
+export function AppShell({ children, view, role, mobileOpen, unread, onNavigate, onRoleChange, onMobileToggle, onSearch }: Props) {
+  const go = (next: ViewId) => { onNavigate(next); if (mobileOpen) onMobileToggle(); };
+  return <main className="app-shell reference-shell">
+    <header className="site-header">
+      <button className="site-brand" onClick={() => go("map")} aria-label="Brickline home">Brick<span>line</span><i>.</i></button>
+      <nav className="site-nav" aria-label="Main navigation">{primary.map(item => <button key={item.id} className={view === item.id ? "active" : ""} onClick={() => go(item.id)}>{item.label}</button>)}</nav>
+      <div className="site-actions">
+        <button className="site-search" onClick={onSearch} aria-label="Search Brickline"><Search size={18}/><span>Search</span></button>
+        <button className="site-alert" onClick={() => go("alerts")} aria-label="Open alerts"><Bell size={18}/>{unread > 0 && <em>{unread}</em>}</button>
+        <label className="site-role"><span className="sr-only">Workspace mode</span><select value={role} onChange={event => onRoleChange(event.target.value as Role)}><option value="Agent">Agent view</option><option value="Builder">Builder view</option><option value="Buyer">Buyer view</option></select></label>
+        <button className="site-avatar" onClick={() => go("profile")} aria-label="Open profile"><UserRound size={18}/></button>
+        <button className="site-menu-toggle" onClick={onMobileToggle} aria-label={mobileOpen ? "Close menu" : "Open menu"}>{mobileOpen ? <X size={22}/> : <Menu size={22}/>}</button>
+      </div>
+    </header>
+    {mobileOpen && <nav className="site-mobile-nav" aria-label="Mobile navigation">{[...primary, ...secondary].map(item => <button key={item.id} className={view === item.id ? "active" : ""} onClick={() => go(item.id)}>{item.label}</button>)}<div className="mobile-role-choice">{(["Agent", "Builder", "Buyer"] as Role[]).map(option => <button key={option} className={role === option ? "active" : ""} onClick={() => onRoleChange(option)}>{option}</button>)}</div></nav>}
+    <div className="site-subnav"><span>REAL-ESTATE INTELLIGENCE</span><span>GLOBAL PLATFORM <b>·</b> {primary.find(item => item.id === view)?.label || secondary.find(item => item.id === view)?.label || "Overview"}</span><div>{secondary.map(item => <button key={item.id} className={view === item.id ? "active" : ""} onClick={() => go(item.id)}>{item.label}</button>)}</div></div>
+    <section className="content site-content">{children}</section>
+  </main>;
 }

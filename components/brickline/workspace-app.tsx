@@ -7,6 +7,7 @@ import { ProjectDetail } from "./project-detail";
 import { SimpleFormModal, type FormKind, type FormResult } from "./forms";
 import { OverviewView } from "./views/overview-view";
 import { MapView } from "./views/map-view";
+import { AreasView } from "./views/areas-view";
 import { ProjectsView } from "./views/projects-view";
 import { NetworkView } from "./views/network-view";
 import { MarketplaceView } from "./views/marketplace-view";
@@ -30,11 +31,11 @@ export default function WorkspaceApp() {
   const [toast, setToast] = useState("");
   const [form, setForm] = useState<FormKind | null>(null);
   const [messageRecipient, setMessageRecipient] = useState("");
+  const [formArea, setFormArea] = useState("");
   const [projects, setProjects] = useState<Project[]>([]);
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [hydrated, setHydrated] = useState(false);
   const [savedProjects, setSavedProjects] = useState(new Set<string>());
-  const [connections, setConnections] = useState(new Set<string>());
   const [savedOpps, setSavedOpps] = useState(new Set<string>());
   const [applied, setApplied] = useState(new Set<string>());
   const [following, setFollowing] = useState(new Set<string>());
@@ -46,6 +47,9 @@ export default function WorkspaceApp() {
     const load = window.setTimeout(() => {
       setProjects(readStored<Project>("brickline-global-projects"));
       setOpportunities(readStored<Opportunity>("brickline-global-opportunities"));
+      setAlerts(readStored<AlertItem>("brickline-global-alerts"));
+      const savedRole = localStorage.getItem("brickline-global-role");
+      if (savedRole === "Agent" || savedRole === "Builder" || savedRole === "Buyer") setRole(savedRole);
       setHydrated(true);
     }, 0);
     const key = (event: KeyboardEvent) => {
@@ -59,6 +63,8 @@ export default function WorkspaceApp() {
   }, []);
   useEffect(() => { if (hydrated) localStorage.setItem("brickline-global-projects", JSON.stringify(projects)); }, [projects, hydrated]);
   useEffect(() => { if (hydrated) localStorage.setItem("brickline-global-opportunities", JSON.stringify(opportunities)); }, [opportunities, hydrated]);
+  useEffect(() => { if (hydrated) localStorage.setItem("brickline-global-alerts", JSON.stringify(alerts)); }, [alerts, hydrated]);
+  useEffect(() => { if (hydrated) localStorage.setItem("brickline-global-role", role); }, [role, hydrated]);
 
   const navigate = (next: ViewId) => { setView(next); window.scrollTo({ top: 0, behavior: "smooth" }); };
   const toggleSet = (setter: React.Dispatch<React.SetStateAction<Set<string>>>, id: string, added: string, removed: string) => {
@@ -79,16 +85,17 @@ export default function WorkspaceApp() {
     } else if (result.kind === "alert") {
       setAlerts(current => [{ id, title: result.name, body: `Watching ${[result.area, result.country].filter(Boolean).join(", ")}: ${result.notes}`, time: "Just now", read: false }, ...current]);
       navigate("alerts");
-      notify("Radar alert created");
+      notify("Area watch saved on this device");
     } else notify(`Message prepared for ${result.name}`);
   };
 
   let content: React.ReactNode;
   switch (view) {
     case "overview": content = <OverviewView role={role} items={projects} onNavigate={navigate} onAdd={() => setForm("project")}/>; break;
-    case "map": content = <MapView items={projects} onProject={setProjectId} onAdd={() => setForm("project")}/>; break;
+    case "map": content = <MapView items={projects} onProject={setProjectId} onAdd={() => setForm("project")} onNavigate={navigate}/>; break;
     case "projects": content = <ProjectsView items={projects} saved={savedProjects} onProject={setProjectId} onSave={id => toggleSet(setSavedProjects, id, "Project saved", "Project removed from saved")} onAdd={() => setForm("project")}/>; break;
-    case "network": content = <NetworkView role={role} connected={connections} onConnect={id => toggleSet(setConnections, id, "Connection added", "Connection removed")} onMessage={name => { setMessageRecipient(name); setForm("message"); }}/>; break;
+    case "network": content = <NetworkView items={projects} onProject={setProjectId} onAdd={() => setForm("project")}/>; break;
+    case "areas": content = <AreasView items={projects} onProject={setProjectId} onWatch={area => { setFormArea(area); setForm("alert"); }} onMap={() => navigate("map")}/>; break;
     case "marketplace": content = <MarketplaceView items={opportunities} role={role} applied={applied} saved={savedOpps} onApply={id => toggleSet(setApplied, id, "Interest recorded", "Interest withdrawn")} onSave={id => toggleSet(setSavedOpps, id, "Opportunity saved", "Opportunity removed")} onPost={() => setForm("opportunity")}/>; break;
     case "radar": content = <RadarView following={following} onFollow={id => toggleSet(setFollowing, id, "Signal followed", "Signal unfollowed")} onProject={setProjectId} onCreateAlert={() => setForm("alert")}/>; break;
     case "alerts": content = <AlertsView items={alerts} onRead={id => setAlerts(current => current.map(alert => alert.id === id ? { ...alert, read: true } : alert))} onReadAll={() => setAlerts(current => current.map(alert => ({ ...alert, read: true })))} onDelete={id => setAlerts(current => current.filter(alert => alert.id !== id))} onProject={setProjectId} onSettings={() => navigate("profile")}/>; break;
@@ -98,7 +105,7 @@ export default function WorkspaceApp() {
   return <><AppShell view={view} role={role} mobileOpen={mobileOpen} unread={alerts.filter(alert => !alert.read).length} onNavigate={navigate} onRoleChange={setRole} onMobileToggle={() => setMobileOpen(!mobileOpen)} onSearch={() => setSearchOpen(true)}>{content}</AppShell>
     {searchOpen && <GlobalSearch items={projects} query={query} setQuery={setQuery} onClose={() => { setSearchOpen(false); setQuery(""); }} onNavigate={navigate} onProject={setProjectId}/>}
     {projectId && <ProjectDetail id={projectId} items={projects} role={role} saved={savedProjects.has(projectId)} onClose={() => setProjectId(null)} onSave={() => toggleSet(setSavedProjects, projectId, "Project saved", "Project removed from saved")} onNotify={notify} onOpportunity={() => { setProjectId(null); navigate("marketplace"); }}/>}
-    {form && <SimpleFormModal kind={form} recipient={form === "message" ? messageRecipient : ""} onClose={() => { setForm(null); setMessageRecipient(""); }} onSubmit={handleForm}/>}
+    {form && <SimpleFormModal kind={form} recipient={form === "message" ? messageRecipient : ""} initialArea={formArea} onClose={() => { setForm(null); setMessageRecipient(""); setFormArea(""); }} onSubmit={handleForm}/>}
     {toast && <Toast message={toast} onClose={() => setToast("")}/>}
   </>;
 }
