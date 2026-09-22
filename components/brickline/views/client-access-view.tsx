@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ArrowRight, Clock3, Eye, Link2, LockKeyhole, Plus, ShieldCheck, Trash2, Users } from "lucide-react";
 import type { Project, Role, ViewId } from "@/lib/brickline-data";
-import { AdminApprovals } from "../builder-approval";
+import type { PanelCopy } from "@/lib/panel-content";
 
 type ShareMinutes = 15 | 30 | 60 | 120;
 type ShareDraft = { id: string; clientName: string; clientEmail: string; builder: string; minutes: ShareMinutes; createdAt: string };
@@ -14,7 +14,7 @@ const durations: { minutes: ShareMinutes; label: string }[] = [
 ];
 const durationLabel = (minutes: ShareMinutes) => durations.find(option => option.minutes === minutes)?.label || `${minutes} minutes`;
 
-export function ClientAccessView({ role, projects, isAdmin, builderApproved, onNavigate }: { role: Role; projects: Project[]; isAdmin: boolean; builderApproved: boolean; onNavigate: (view: ViewId) => void }) {
+export function ClientAccessView({ role, projects, copy, allPanelsApproved, onNavigate }: { role: Role; projects: Project[]; copy: PanelCopy; allPanelsApproved: boolean; onNavigate: (view: ViewId) => void }) {
   const [drafts, setDrafts] = useState<ShareDraft[]>([]);
   const [ready, setReady] = useState(false);
   const [clientName, setClientName] = useState("");
@@ -47,23 +47,22 @@ export function ClientAccessView({ role, projects, isAdmin, builderApproved, onN
 
   if (role === "Client") return <div className="page access-page">
     <div className="reference-eyebrow">CLIENT PANEL <span>·</span> EXPLORE + SHARED ACCESS</div>
-    <div className="reference-heading-row"><h1>Explore freely. <em>Meet the builder</em> through your agent.</h1></div>
-    <div className="access-intro"><div><span className="micro-label">PUBLIC EXPLORATION</span><h2>Start with the map.</h2><p>Browse locations, project summaries, and area intelligence. Builder contact details and private profile information are not part of public browsing.</p><button className="reference-primary" onClick={() => onNavigate("map")}>Explore map <ArrowRight size={16}/></button></div><div><span className="micro-label">SHARED WITH ME</span><h2>Your private introductions.</h2><p>When an agent shares a builder profile, it will appear here for the time they choose. Only the invited, signed-in client will be able to open it.</p><span className="access-count"><LockKeyhole size={17}/> No active shares</span></div></div>
+    <div className="reference-heading-row"><h1>{copy.headline} <em>{copy.accent}</em></h1></div>
+    <div className="access-intro"><div><span className="micro-label">PUBLIC EXPLORATION</span><h2>Start with the map.</h2><p>{copy.description}</p><button className="reference-primary" onClick={() => onNavigate("map")}>Explore map <ArrowRight size={16}/></button></div><div><span className="micro-label">SHARED WITH ME</span><h2>Your private introductions.</h2><p>When an agent shares a builder profile, it will appear here for the time they choose. Only the invited, signed-in client will be able to open it.</p><span className="access-count"><LockKeyhole size={17}/> No active shares</span></div></div>
     <section className="access-explainer"><ShieldCheck size={21}/><div><b>Private by design</b><p>Access links, countdowns, and view receipts will become available after secure client accounts and shared storage are connected. There are no simulated shares in this preview.</p></div></section>
   </div>;
 
   if (role === "Builder") return <div className="page access-page">
     <div className="reference-eyebrow">BUILDER PANEL <span>·</span> PROFILE ACCESS</div>
-    <div className="reference-heading-row"><h1>Keep your profile <em>in your control.</em></h1></div>
-    {builderApproved && <div className="builder-approved-banner"><ShieldCheck size={18}/> Admin approved · Agent, Builder, and Client panels are available in the panel switcher.</div>}
-    <div className="access-intro"><div><span className="micro-label">YOUR PUBLIC FOOTPRINT</span><h2>Publish projects.</h2><p>Project summaries and their map locations help agents and clients discover your work. Your builder profile stays behind an agent introduction for clients.</p><button className="reference-primary" onClick={() => onNavigate("projects")}>Manage projects <ArrowRight size={16}/></button></div><div><span className="micro-label">PRIVATE PROFILE</span><h2>Access is time-boxed.</h2><p>Agents can prepare introductions lasting from 15 minutes to 2 hours. Live invitations and view tracking are not active yet.</p><span className="access-count"><LockKeyhole size={17}/> No live access granted</span></div></div>
-    {isAdmin && <AdminApprovals/>}
+    <div className="reference-heading-row"><h1>{copy.headline} <em>{copy.accent}</em></h1></div>
+    {allPanelsApproved && <div className="builder-approved-banner"><ShieldCheck size={18}/> Admin approved · Agent, Builder, and Client panels are available in the panel switcher.</div>}
+    <div className="access-intro"><div><span className="micro-label">YOUR PUBLIC FOOTPRINT</span><h2>Publish projects.</h2><p>{copy.description}</p><button className="reference-primary" onClick={() => onNavigate("projects")}>Manage projects <ArrowRight size={16}/></button></div><div><span className="micro-label">PRIVATE PROFILE</span><h2>Access is time-boxed.</h2><p>Agents can prepare introductions lasting from 15 minutes to 2 hours. Live invitations and view tracking are not active yet.</p><span className="access-count"><LockKeyhole size={17}/> No live access granted</span></div></div>
   </div>;
 
   return <div className="page access-page">
     <div className="reference-eyebrow">AGENT PANEL <span>·</span> CLIENT INTRODUCTIONS</div>
-    <div className="reference-heading-row"><h1>From discovery to <em>a trusted introduction.</em></h1></div>
-    <div className="access-intro"><div><span className="micro-label">THE WORKFLOW</span><h2>Choose the right builder for your client.</h2><p>Find a builder on the map, prepare a client-specific invitation, then choose an access window from 15 minutes to 2 hours when secure sharing is connected.</p><button className="reference-primary" onClick={() => onNavigate("network")}>Explore builders <ArrowRight size={16}/></button></div><div className="access-steps"><span><b>01</b> Pick client + builder</span><span><b>02</b> Choose a 15-minute to 2-hour window</span><span><b>03</b> Send authenticated access</span><span><b>04</b> See real view activity</span></div></div>
+    <div className="reference-heading-row"><h1>{copy.headline} <em>{copy.accent}</em></h1></div>
+    <div className="access-intro"><div><span className="micro-label">THE WORKFLOW</span><h2>Choose the right builder for your client.</h2><p>{copy.description}</p><button className="reference-primary" onClick={() => onNavigate("network")}>Explore builders <ArrowRight size={16}/></button></div><div className="access-steps"><span><b>01</b> Pick client + builder</span><span><b>02</b> Choose a 15-minute to 2-hour window</span><span><b>03</b> Send authenticated access</span><span><b>04</b> See real view activity</span></div></div>
     <div className="access-grid"><section className="access-card"><div className="access-card-title"><span className="micro-label">PREPARE AN INTRODUCTION</span><Clock3 size={18}/></div><h2>New client share</h2><p className="access-caption">Save the details as a private draft on this device. A draft does not send a link or grant access.</p><form onSubmit={saveDraft}><label>Client name<input value={clientName} onChange={event => setClientName(event.target.value)} placeholder="Client's name"/></label><label>Client email<input type="email" value={clientEmail} onChange={event => setClientEmail(event.target.value)} placeholder="client@example.com"/></label><label>Builder profile<select value={builder} onChange={event => setBuilder(event.target.value)}><option value="">Select a builder</option>{builders.map(name => <option key={name} value={name}>{name}</option>)}</select></label><fieldset><legend>Access duration</legend><div className="access-duration">{durations.map(option => <button key={option.minutes} type="button" className={minutes === option.minutes ? "active" : ""} onClick={() => setMinutes(option.minutes)}>{option.label}</button>)}</div></fieldset>{error && <p className="access-error" role="alert">{error}</p>}<button type="submit" className="reference-primary" disabled={!builders.length}><Plus size={15}/>Save draft</button>{!builders.length && <small className="access-hint">Add a real project first to make its builder available.</small>}</form></section>
     <section className="access-card"><div className="access-card-title"><span className="micro-label">CLIENT ACTIVITY</span><Eye size={18}/></div><h2>Introductions</h2><div className="access-metrics"><span><b>{drafts.length}</b>LOCAL DRAFTS</span><span><b>0</b>ACTIVE SHARES</span><span><b>0</b>VERIFIED VIEWS</span></div>{drafts.length ? <div className="access-drafts">{drafts.map(draft => <article key={draft.id}><div><b>{draft.clientName}</b><small>{draft.clientEmail}</small><span>{draft.builder} · {durationLabel(draft.minutes)} · Draft, not sent</span></div><button onClick={() => setDrafts(current => current.filter(item => item.id !== draft.id))} aria-label={`Delete draft for ${draft.clientName}`}><Trash2 size={16}/></button></article>)}</div> : <div className="access-empty"><Users size={28}/><b>No introductions prepared</b><p>Client and builder details you enter will show here as local drafts.</p></div>}<div className="access-service-note"><Link2 size={17}/><p>Live links, expiration, and view receipts are unavailable until authenticated sharing and shared project data are connected.</p></div></section></div>
   </div>;

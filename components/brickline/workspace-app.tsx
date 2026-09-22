@@ -15,8 +15,10 @@ import { RadarView } from "./views/radar-view";
 import { AlertsView, type AlertItem } from "./views/alerts-view";
 import { ProfileView } from "./views/profile-view";
 import { ClientAccessView } from "./views/client-access-view";
-import { BuilderApprovalGate } from "./builder-approval";
-import type { BuilderAccess } from "@/lib/builder-access";
+import { PanelAccessGate } from "./panel-access-gate";
+import { AdminView } from "./views/admin-view";
+import type { PanelAccess } from "@/lib/panel-access";
+import type { PanelContent } from "@/lib/panel-content";
 import type { Opportunity, Project, Role, ViewId } from "@/lib/brickline-data";
 
 const readStored = <T,>(key: string): T[] => {
@@ -24,9 +26,10 @@ const readStored = <T,>(key: string): T[] => {
   catch { return []; }
 };
 
-export default function WorkspaceApp({ builderAccess }: { builderAccess: BuilderAccess }) {
-  const [view, setView] = useState<ViewId>("map");
-  const [role, setRole] = useState<Role>("Agent");
+export default function WorkspaceApp({ panelAccess, panelContent: initialPanelContent }: { panelAccess: PanelAccess; panelContent: PanelContent }) {
+  const [panelContent, setPanelContent] = useState(initialPanelContent);
+  const [view, setView] = useState<ViewId>(panelAccess.isAdmin ? "admin" : "map");
+  const [role, setRole] = useState<Role>(panelAccess.allowedRoles[0] || "Agent");
   const [mobileOpen, setMobileOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -52,7 +55,10 @@ export default function WorkspaceApp({ builderAccess }: { builderAccess: Builder
       setOpportunities(readStored<Opportunity>("brickline-global-opportunities"));
       setAlerts(readStored<AlertItem>("brickline-global-alerts"));
       const savedRole = localStorage.getItem("brickline-global-role");
-      if (savedRole === "Agent" || savedRole === "Builder" || savedRole === "Client") setRole(savedRole);
+      if ((savedRole === "Agent" || savedRole === "Builder" || savedRole === "Client") && panelAccess.allowedRoles.includes(savedRole)) {
+        setRole(savedRole);
+        if (!panelAccess.isAdmin) setView(savedRole === "Agent" ? "map" : "client-access");
+      }
       setHydrated(true);
     }, 0);
     const key = (event: KeyboardEvent) => {
@@ -63,14 +69,14 @@ export default function WorkspaceApp({ builderAccess }: { builderAccess: Builder
     };
     window.addEventListener("keydown", key);
     return () => { window.clearTimeout(load); window.removeEventListener("keydown", key); };
-  }, []);
+  }, [panelAccess.allowedRoles, panelAccess.isAdmin]);
   useEffect(() => { if (hydrated) localStorage.setItem("brickline-global-projects", JSON.stringify(projects)); }, [projects, hydrated]);
   useEffect(() => { if (hydrated) localStorage.setItem("brickline-global-opportunities", JSON.stringify(opportunities)); }, [opportunities, hydrated]);
   useEffect(() => { if (hydrated) localStorage.setItem("brickline-global-alerts", JSON.stringify(alerts)); }, [alerts, hydrated]);
   useEffect(() => { if (hydrated) localStorage.setItem("brickline-global-role", role); }, [role, hydrated]);
 
-  const navigate = (next: ViewId) => { setView(next); window.scrollTo({ top: 0, behavior: "smooth" }); };
-  const changeRole = (next: Role) => { setRole(next); setProjectId(null); setForm(null); navigate(next === "Agent" ? "map" : "client-access"); };
+  const navigate = (next: ViewId) => { if (next === "admin" && !panelAccess.isAdmin) return; setView(next); window.scrollTo({ top: 0, behavior: "smooth" }); };
+  const changeRole = (next: Role) => { if (!panelAccess.allowedRoles.includes(next)) return; setRole(next); setProjectId(null); setForm(null); navigate(next === "Agent" ? "map" : "client-access"); };
   const requestProjectForm = () => { if (role === "Client") { navigate("client-access"); notify("Client panel is for browsing; project publishing belongs to builders."); } else setForm("project"); };
   const toggleSet = (setter: React.Dispatch<React.SetStateAction<Set<string>>>, id: string, added: string, removed: string) => {
     setter(previous => { const next = new Set(previous); if (next.has(id)) { next.delete(id); notify(removed); } else { next.add(id); notify(added); } return next; });
@@ -94,8 +100,8 @@ export default function WorkspaceApp({ builderAccess }: { builderAccess: Builder
     } else notify(`Message prepared for ${result.name}`);
   };
 
-  if (!hydrated && builderAccess.mode !== "preview") return <div className="approval-shell"><div className="approval-brand">Brick<span>line.</span></div></div>;
-  if (role === "Builder" && builderAccess.mode !== "preview" && !builderAccess.isAdmin && builderAccess.status !== "approved") return <BuilderApprovalGate access={builderAccess}/>;
+  if (!hydrated && panelAccess.mode !== "preview") return <div className="approval-shell"><div className="approval-brand">Brick<span>line.</span></div></div>;
+  if (panelAccess.mode !== "preview" && !panelAccess.isAdmin && (panelAccess.status !== "approved" || !panelAccess.allowedRoles.length)) return <PanelAccessGate access={panelAccess}/>;
 
   let content: React.ReactNode;
   switch (view) {
@@ -107,11 +113,12 @@ export default function WorkspaceApp({ builderAccess }: { builderAccess: Builder
     case "marketplace": content = <MarketplaceView items={opportunities} role={role} applied={applied} saved={savedOpps} onApply={id => toggleSet(setApplied, id, "Interest recorded", "Interest withdrawn")} onSave={id => toggleSet(setSavedOpps, id, "Opportunity saved", "Opportunity removed")} onPost={() => setForm("opportunity")}/>; break;
     case "radar": content = <RadarView following={following} onFollow={id => toggleSet(setFollowing, id, "Signal followed", "Signal unfollowed")} onProject={setProjectId} onCreateAlert={() => setForm("alert")}/>; break;
     case "alerts": content = <AlertsView items={alerts} onRead={id => setAlerts(current => current.map(alert => alert.id === id ? { ...alert, read: true } : alert))} onReadAll={() => setAlerts(current => current.map(alert => ({ ...alert, read: true })))} onDelete={id => setAlerts(current => current.filter(alert => alert.id !== id))} onProject={setProjectId} onSettings={() => navigate("profile")}/>; break;
-    case "profile": content = <ProfileView role={role} onRoleChange={changeRole} onNotify={notify}/>; break;
-    case "client-access": content = <ClientAccessView role={role} projects={projects} isAdmin={builderAccess.isAdmin} builderApproved={builderAccess.mode === "member" && builderAccess.status === "approved"} onNavigate={navigate}/>; break;
+    case "profile": content = <ProfileView role={role} allowedRoles={panelAccess.allowedRoles} onRoleChange={changeRole} onNotify={notify}/>; break;
+    case "client-access": content = <ClientAccessView role={role} projects={projects} copy={panelContent[role]} allPanelsApproved={panelAccess.mode === "member" && panelAccess.allowedRoles.length === 3} onNavigate={navigate}/>; break;
+    case "admin": content = panelAccess.isAdmin ? <AdminView panelContent={panelContent} onContentChange={(changedRole, copy) => setPanelContent(current => ({ ...current, [changedRole]: copy }))}/> : <div className="page">Admin access is required.</div>; break;
   }
 
-  return <><AppShell view={view} role={role} mobileOpen={mobileOpen} unread={alerts.filter(alert => !alert.read).length} onNavigate={navigate} onRoleChange={changeRole} onMobileToggle={() => setMobileOpen(!mobileOpen)} onSearch={() => setSearchOpen(true)}>{content}</AppShell>
+  return <><AppShell view={view} role={role} allowedRoles={panelAccess.allowedRoles} isAdmin={panelAccess.isAdmin} mobileOpen={mobileOpen} unread={alerts.filter(alert => !alert.read).length} onNavigate={navigate} onRoleChange={changeRole} onMobileToggle={() => setMobileOpen(!mobileOpen)} onSearch={() => setSearchOpen(true)}>{content}</AppShell>
     {searchOpen && <GlobalSearch items={projects} query={query} setQuery={setQuery} onClose={() => { setSearchOpen(false); setQuery(""); }} onNavigate={navigate} onProject={setProjectId}/>}
     {projectId && <ProjectDetail id={projectId} items={projects} role={role} saved={savedProjects.has(projectId)} onClose={() => setProjectId(null)} onSave={() => toggleSet(setSavedProjects, projectId, "Project saved", "Project removed from saved")} onNotify={notify} onOpportunity={() => { setProjectId(null); navigate("marketplace"); }}/>}
     {form && <SimpleFormModal kind={form} recipient={form === "message" ? messageRecipient : ""} initialArea={formArea} onClose={() => { setForm(null); setMessageRecipient(""); setFormArea(""); }} onSubmit={handleForm}/>}

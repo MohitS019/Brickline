@@ -1,0 +1,68 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { Check, LockKeyhole, Search, ShieldCheck, UserRoundCheck, UserRoundX, X } from "lucide-react";
+import type { Role } from "@/lib/brickline-data";
+import type { PanelContent, PanelCopy } from "@/lib/panel-content";
+
+type Account = { userId: string; email: string; name: string; company: string; status: "pending" | "approved" | "declined" | "suspended"; requestedRole: Role; agentAccess: number; builderAccess: number; clientAccess: number; requestedAt: number; reviewedAt: number | null };
+type Action = "approve" | "decline" | "suspend" | "restore" | "set-panels";
+const panels: { role: Role; key: "agentAccess" | "builderAccess" | "clientAccess" }[] = [
+  { role: "Agent", key: "agentAccess" }, { role: "Builder", key: "builderAccess" }, { role: "Client", key: "clientAccess" },
+];
+
+export function AdminView({ panelContent, onContentChange }: { panelContent: PanelContent; onContentChange: (role: Role, copy: PanelCopy) => void }) {
+  const [section, setSection] = useState<"access" | "content">("access");
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [busyId, setBusyId] = useState("");
+  const [filter, setFilter] = useState<"all" | Account["status"]>("all");
+  const [query, setQuery] = useState("");
+  const [refreshKey, setRefreshKey] = useState(0);
+  useEffect(() => {
+    let active = true;
+    fetch("/api/panel-access", { cache: "no-store" }).then(async response => {
+      const result = await response.json() as { requests?: Account[]; error?: string };
+      if (!response.ok) throw new Error(result.error || "Could not load accounts.");
+      if (active) setAccounts(result.requests || []);
+    }).catch(cause => { if (active) setError(cause instanceof Error ? cause.message : "Could not load accounts."); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [refreshKey]);
+  const shown = useMemo(() => accounts.filter(account => (filter === "all" || account.status === filter) && `${account.name} ${account.email} ${account.company} ${account.requestedRole}`.toLowerCase().includes(query.toLowerCase())), [accounts, filter, query]);
+  const mutate = async (account: Account, action: Action, newPanels?: Record<Role, boolean>) => {
+    setBusyId(account.userId); setError("");
+    try {
+      const response = await fetch("/api/panel-access", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId: account.userId, action, panels: newPanels }) });
+      const result = await response.json() as { account?: Account; error?: string };
+      if (!response.ok || !result.account) throw new Error(result.error || "Could not save change.");
+      setAccounts(current => current.map(item => item.userId === account.userId ? result.account! : item));
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not save change."); }
+    finally { setBusyId(""); }
+  };
+  const togglePanel = (account: Account, role: Role) => mutate(account, "set-panels", {
+    Agent: role === "Agent" ? !account.agentAccess : Boolean(account.agentAccess),
+    Builder: role === "Builder" ? !account.builderAccess : Boolean(account.builderAccess),
+    Client: role === "Client" ? !account.clientAccess : Boolean(account.clientAccess),
+  });
+
+  return <div className="page admin-page"><div className="reference-eyebrow">ADMIN CONTROL <span>·</span> ALL THREE PANELS</div><div className="reference-heading-row"><h1>Manage access <em>and content.</em></h1></div><div className="admin-main-tabs"><button className={section === "access" ? "active" : ""} onClick={() => setSection("access")}>Panel access</button><button className={section === "content" ? "active" : ""} onClick={() => setSection("content")}>Panel content</button></div>{section === "content" ? <div className="admin-content-grid">{panels.map(panel => <PanelContentEditor key={panel.role} role={panel.role} copy={panelContent[panel.role]} onSaved={copy => onContentChange(panel.role, copy)}/>)}</div> : <><div className="admin-summary"><span><b>{accounts.filter(item => item.status === "pending").length}</b>Pending</span><span><b>{accounts.filter(item => item.status === "approved").length}</b>Approved</span><span><b>{accounts.filter(item => item.status === "suspended").length}</b>Suspended</span><span><b>{accounts.length}</b>Total accounts</span></div><section className="admin-directory"><div className="admin-directory-head"><div><span className="micro-label">ACCOUNT DIRECTORY</span><h2>Panel permissions</h2><p>Approve requests, change individual panel access, or suspend an account. Only this site&apos;s admin can make these changes.</p></div><button onClick={() => { setLoading(true); setRefreshKey(value => value + 1); }}>Refresh</button></div><div className="admin-toolbar"><div className="admin-filters">{(["all", "pending", "approved", "suspended", "declined"] as const).map(value => <button key={value} className={filter === value ? "active" : ""} onClick={() => setFilter(value)}>{value === "all" ? "All" : value[0].toUpperCase() + value.slice(1)}</button>)}</div><label><Search size={16}/><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Search name, email, company"/></label></div>{error && <p className="admin-error" role="alert">{error}</p>}{loading ? <p className="admin-empty">Loading accounts…</p> : shown.length ? <div className="admin-accounts">{shown.map(account => <article key={account.userId} className="admin-account"><div className="admin-account-identity"><span className="admin-account-avatar">{account.name.slice(0, 1).toUpperCase()}</span><div><b>{account.name}</b><small>{account.email}</small><span>{account.company || `${account.requestedRole} account`}</span></div><em className={`admin-status ${account.status}`}>{account.status}</em></div><div className="admin-account-body"><div><span className="micro-label">REQUESTED</span><strong>{account.requestedRole}</strong><small>{new Date(account.requestedAt).toLocaleDateString()}</small></div><div className="admin-panel-controls"><span className="micro-label">PANELS</span><div>{panels.map(panel => <button key={panel.role} disabled={busyId === account.userId || !["approved", "suspended"].includes(account.status)} className={account[panel.key] ? "granted" : ""} onClick={() => togglePanel(account, panel.role)} aria-pressed={Boolean(account[panel.key])}><span>{account[panel.key] ? <Check size={13}/> : <X size={13}/>}</span>{panel.role}</button>)}</div></div><div className="admin-account-actions">{account.status === "pending" ? <><button className="approve" disabled={busyId === account.userId} onClick={() => mutate(account, "approve")}><UserRoundCheck size={15}/>Approve</button><button disabled={busyId === account.userId} onClick={() => mutate(account, "decline")}><UserRoundX size={15}/>Decline</button></> : account.status === "approved" ? <button disabled={busyId === account.userId} onClick={() => mutate(account, "suspend")}><LockKeyhole size={15}/>Suspend</button> : account.status === "suspended" ? <button className="approve" disabled={busyId === account.userId} onClick={() => mutate(account, "restore")}><ShieldCheck size={15}/>Restore</button> : <span>Can submit a new request</span>}</div></div></article>)}</div> : <div className="admin-empty"><ShieldCheck size={30}/><b>No matching accounts</b><p>Signed-in people appear after they request access.</p></div>}</section></>}</div>;
+}
+
+function PanelContentEditor({ role, copy, onSaved }: { role: Role; copy: PanelCopy; onSaved: (copy: PanelCopy) => void }) {
+  const [draft, setDraft] = useState(copy);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  const save = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault(); setBusy(true); setMessage("");
+    try {
+      const response = await fetch("/api/panel-content", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ role, ...draft }) });
+      const result = await response.json() as { content?: PanelCopy; error?: string };
+      if (!response.ok || !result.content) throw new Error(result.error || "Could not save content.");
+      setDraft(result.content); onSaved(result.content); setMessage("Saved. Everyone will see this content on their next visit.");
+    } catch (cause) { setMessage(cause instanceof Error ? cause.message : "Could not save content."); }
+    finally { setBusy(false); }
+  };
+  return <form className="admin-content-card" onSubmit={save}><span className="micro-label">{role.toUpperCase()} PANEL</span><h2>{role} introduction</h2><label>Heading<input maxLength={120} required value={draft.headline} onChange={event => setDraft(current => ({ ...current, headline: event.target.value }))}/></label><label>Highlighted phrase<input maxLength={120} required value={draft.accent} onChange={event => setDraft(current => ({ ...current, accent: event.target.value }))}/></label><label>Introduction<textarea maxLength={1000} rows={5} required value={draft.description} onChange={event => setDraft(current => ({ ...current, description: event.target.value }))}/></label><button type="submit" className="reference-primary" disabled={busy || JSON.stringify(draft) === JSON.stringify(copy)}>{busy ? "Saving…" : "Save content"}</button>{message && <p role="status">{message}</p>}</form>;
+}

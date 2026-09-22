@@ -1,5 +1,5 @@
 export type Role = "Agent" | "Builder" | "Client";
-export type ViewId = "overview" | "map" | "projects" | "network" | "areas" | "marketplace" | "radar" | "alerts" | "profile" | "client-access";
+export type ViewId = "overview" | "map" | "projects" | "network" | "areas" | "marketplace" | "radar" | "alerts" | "profile" | "client-access" | "admin";
 export type ProjectStatus = "New construction" | "Redevelopment" | "Approval stage" | "Construction started";
 
 export interface Project {

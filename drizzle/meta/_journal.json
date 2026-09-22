@@ -8,6 +8,13 @@
       "when": 1790069310703,
       "tag": "0000_flat_bastion",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1790070490407,
+      "tag": "0001_next_wonder_man",
+      "breakpoints": true
     }
   ]
 }

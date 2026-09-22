@@ -1,8 +1,9 @@
 import WorkspaceApp from "@/components/brickline/workspace-app";
-import { getBuilderAccess } from "@/lib/builder-access";
+import { getPanelAccess } from "@/lib/panel-access";
+import { getPanelContent } from "@/lib/panel-content";
 
 export const dynamic = "force-dynamic";
 export default async function Home() {
-  const builderAccess = await getBuilderAccess();
-  return <WorkspaceApp builderAccess={builderAccess}/>;
+  const [panelAccess, panelContent] = await Promise.all([getPanelAccess(), getPanelContent()]);
+  return <WorkspaceApp panelAccess={panelAccess} panelContent={panelContent}/>;
 }
