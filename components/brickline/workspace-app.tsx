@@ -51,7 +51,6 @@ export default function WorkspaceApp({ panelAccess, panelContent: initialPanelCo
   useEffect(() => {
     // Keep old India-workspace records recoverable under their original keys.
     const load = window.setTimeout(() => {
-      setProjects(readStored<Project>("brickline-global-projects"));
       setOpportunities(readStored<Opportunity>("brickline-global-opportunities"));
       setAlerts(readStored<AlertItem>("brickline-global-alerts"));
       const savedRole = localStorage.getItem("brickline-global-role");
@@ -60,6 +59,7 @@ export default function WorkspaceApp({ panelAccess, panelContent: initialPanelCo
         if (!panelAccess.isAdmin) setView(savedRole === "Agent" ? "map" : "client-access");
       }
       setHydrated(true);
+      fetch("/api/projects", { cache: "no-store" }).then(async response => { const result = await response.json() as { projects?: Project[] }; if (response.ok) setProjects(result.projects || []); }).catch(() => notify("Projects could not be loaded"));
     }, 0);
     const key = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
@@ -69,26 +69,26 @@ export default function WorkspaceApp({ panelAccess, panelContent: initialPanelCo
     };
     window.addEventListener("keydown", key);
     return () => { window.clearTimeout(load); window.removeEventListener("keydown", key); };
-  }, [panelAccess.allowedRoles, panelAccess.isAdmin]);
-  useEffect(() => { if (hydrated) localStorage.setItem("brickline-global-projects", JSON.stringify(projects)); }, [projects, hydrated]);
+  }, [panelAccess.allowedRoles, panelAccess.isAdmin, notify]);
   useEffect(() => { if (hydrated) localStorage.setItem("brickline-global-opportunities", JSON.stringify(opportunities)); }, [opportunities, hydrated]);
   useEffect(() => { if (hydrated) localStorage.setItem("brickline-global-alerts", JSON.stringify(alerts)); }, [alerts, hydrated]);
   useEffect(() => { if (hydrated) localStorage.setItem("brickline-global-role", role); }, [role, hydrated]);
 
   const navigate = (next: ViewId) => { if (next === "admin" && !panelAccess.isAdmin) return; setView(next); window.scrollTo({ top: 0, behavior: "smooth" }); };
   const changeRole = (next: Role) => { if (!panelAccess.allowedRoles.includes(next)) return; setRole(next); setProjectId(null); setForm(null); navigate(next === "Agent" ? "map" : "client-access"); };
-  const requestProjectForm = () => { if (role === "Client") { navigate("client-access"); notify("Client panel is for browsing; project publishing belongs to builders."); } else setForm("project"); };
+  const requestProjectForm = () => { if (role !== "Builder") { navigate("client-access"); notify("Only a verified Builder account can register projects."); } else setForm("project"); };
   const toggleSet = (setter: React.Dispatch<React.SetStateAction<Set<string>>>, id: string, added: string, removed: string) => {
     setter(previous => { const next = new Set(previous); if (next.has(id)) { next.delete(id); notify(removed); } else { next.add(id); notify(added); } return next; });
   };
-  const handleForm = (result: FormResult) => {
+  const handleForm = async (result: FormResult) => {
     const id = `user-${Date.now()}`;
     if (result.kind === "project") {
-      const created: Project = { id, name: result.name, area: result.area, country: result.country, siteAddress: result.siteAddress || undefined, reraNumber: result.reraNumber || undefined, currency: result.currency, status: result.status, builder: result.builder, value: result.value, homes: result.homes, completion: "Not scheduled", confidence: 100, updated: "Just added", description: result.notes, tags: ["Added by you"], coordinates: { x: 50, y: 50 } };
-      setProjects(current => [created, ...current]);
-      navigate("map");
-      setProjectId(id);
-      notify("Project added to this device's global workspace");
+      try {
+        const response = await fetch("/api/projects", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(result) });
+        const saved = await response.json() as { project?: Project; error?: string };
+        if (!response.ok || !saved.project) throw new Error(saved.error || "Project could not be registered.");
+        setProjects(current => [saved.project!, ...current]); navigate("map"); setProjectId(saved.project.id); notify("Project registered securely");
+      } catch (cause) { notify(cause instanceof Error ? cause.message : "Project could not be registered."); }
     } else if (result.kind === "opportunity") {
       setOpportunities(current => [{ id, title: result.name, builder: result.builder, area: [result.area, result.country].filter(Boolean).join(", "), type: "Partner mandate", commission: result.commission, deadline: "Open", matches: 0, description: result.notes }, ...current]);
       navigate("marketplace");

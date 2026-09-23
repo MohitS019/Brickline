@@ -15,6 +15,20 @@
       "when": 1790070490407,
       "tag": "0001_next_wonder_man",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1790136798312,
+      "tag": "0002_warm_preak",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1790137283765,
+      "tag": "0003_same_night_thrasher",
+      "breakpoints": true
     }
   ]
 }
