@@ -24,6 +24,11 @@ export interface RadarSignal {
   confidence: number; detail: string; projectId?: string;
 }
 
+export interface AreaSignal {
+  id: string; title: string; area: string; state: string; category: ProjectStatus;
+  detail: string; sourceNote: string; eventDate: string; createdAt: number;
+}
+
 // The global workspace starts without fabricated project, person, or signal records.
 export const projects: Project[] = [];
 export const network: NetworkMember[] = [];

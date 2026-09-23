@@ -19,7 +19,7 @@ import { PanelAccessGate } from "./panel-access-gate";
 import { AdminView } from "./views/admin-view";
 import type { PanelAccess } from "@/lib/panel-access";
 import type { PanelContent } from "@/lib/panel-content";
-import type { Opportunity, Project, Role, ViewId } from "@/lib/brickline-data";
+import type { AreaSignal, Opportunity, Project, Role, ViewId } from "@/lib/brickline-data";
 
 const readStored = <T,>(key: string): T[] => {
   try { return JSON.parse(localStorage.getItem(key) || "[]") as T[]; }
@@ -46,6 +46,7 @@ export default function WorkspaceApp({ panelAccess, panelContent: initialPanelCo
   const [applied, setApplied] = useState(new Set<string>());
   const [following, setFollowing] = useState(new Set<string>());
   const [alerts, setAlerts] = useState<AlertItem[]>([]);
+  const [areaSignals, setAreaSignals] = useState<AreaSignal[]>([]);
   const notify = useCallback((message: string) => setToast(message), []);
 
   useEffect(() => {
@@ -60,6 +61,7 @@ export default function WorkspaceApp({ panelAccess, panelContent: initialPanelCo
       }
       setHydrated(true);
       fetch("/api/projects", { cache: "no-store" }).then(async response => { const result = await response.json() as { projects?: Project[] }; if (response.ok) setProjects(result.projects || []); }).catch(() => notify("Projects could not be loaded"));
+      if (panelAccess.isAdmin || panelAccess.allowedRoles.includes("Agent")) fetch("/api/area-signals", { cache: "no-store" }).then(async response => { const result = await response.json() as { signals?: AreaSignal[] }; if (response.ok) setAreaSignals(result.signals || []); }).catch(() => notify("Area signals could not be loaded"));
     }, 0);
     const key = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
@@ -111,9 +113,9 @@ export default function WorkspaceApp({ panelAccess, panelContent: initialPanelCo
     case "network": content = <NetworkView items={projects} role={role} onProject={setProjectId} onAdd={requestProjectForm}/>; break;
     case "areas": content = <AreasView items={projects} onProject={setProjectId} onWatch={area => { setFormArea(area); setForm("alert"); }} onMap={() => navigate("map")}/>; break;
     case "marketplace": content = <MarketplaceView items={opportunities} role={role} applied={applied} saved={savedOpps} onApply={id => toggleSet(setApplied, id, "Interest recorded", "Interest withdrawn")} onSave={id => toggleSet(setSavedOpps, id, "Opportunity saved", "Opportunity removed")} onPost={() => setForm("opportunity")}/>; break;
-    case "radar": content = <RadarView following={following} onFollow={id => toggleSet(setFollowing, id, "Signal followed", "Signal unfollowed")} onProject={setProjectId} onCreateAlert={() => setForm("alert")}/>; break;
+    case "radar": content = <RadarView signals={areaSignals} following={following} onFollow={id => toggleSet(setFollowing, id, "Signal followed", "Signal unfollowed")} onCreateAlert={() => setForm("alert")}/>; break;
     case "alerts": content = <AlertsView items={alerts} onRead={id => setAlerts(current => current.map(alert => alert.id === id ? { ...alert, read: true } : alert))} onReadAll={() => setAlerts(current => current.map(alert => ({ ...alert, read: true })))} onDelete={id => setAlerts(current => current.filter(alert => alert.id !== id))} onProject={setProjectId} onSettings={() => navigate("profile")}/>; break;
-    case "profile": content = <ProfileView role={role} allowedRoles={panelAccess.allowedRoles} onRoleChange={changeRole} onNotify={notify}/>; break;
+    case "profile": content = <ProfileView role={role} allowedRoles={panelAccess.allowedRoles} verificationLabel={panelAccess.verificationLabel} verifiedAt={panelAccess.verifiedAt} onRoleChange={changeRole} onNotify={notify}/>; break;
     case "client-access": content = <ClientAccessView role={role} projects={projects} copy={panelContent[role]} allPanelsApproved={panelAccess.mode === "member" && panelAccess.allowedRoles.length === 3} onNavigate={navigate}/>; break;
     case "admin": content = panelAccess.isAdmin ? <AdminView panelContent={panelContent} onContentChange={(changedRole, copy) => setPanelContent(current => ({ ...current, [changedRole]: copy }))}/> : <div className="page">Admin access is required.</div>; break;
   }

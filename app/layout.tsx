@@ -3,8 +3,8 @@ import "./globals.css";
 import "./reference.css";
 
 export const metadata: Metadata = {
-  title: "Brickline | Global real estate map",
-  description: "Explore real estate projects and opportunities on a worldwide map.",
+  title: "Brickline | India real estate intelligence",
+  description: "Explore verified Indian real estate projects, builders, and area intelligence.",
   other: {
     "codex-preview": "development",
   },

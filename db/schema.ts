@@ -17,6 +17,16 @@ export const builderAccessRequests = sqliteTable("builder_access_requests", {
   consentAt: integer("consent_at"),
   consentWithdrawnAt: integer("consent_withdrawn_at"),
   deletionRequestedAt: integer("deletion_requested_at"),
+  businessAddress: text("business_address"),
+  contactPerson: text("contact_person"),
+  agencyName: text("agency_name"),
+  phoneEncrypted: text("phone_encrypted"),
+  reraEncrypted: text("account_rera_encrypted"),
+  gstEncrypted: text("gst_encrypted"),
+  reraFingerprint: text("account_rera_fingerprint"),
+  gstFingerprint: text("gst_fingerprint"),
+  rejectionReason: text("rejection_reason"),
+  verifiedAt: integer("verified_at"),
 });
 
 export const panelContent = sqliteTable("panel_content", {
@@ -42,6 +52,7 @@ export const clientAccessGrants = sqliteTable("client_access_grants", {
   boundDeviceHash: text("bound_device_hash"),
   lastOpenedAt: integer("last_opened_at"),
   lastCountry: text("last_country"),
+  deviceLabel: text("device_label"),
 }, table => [index("idx_grants_client_expiry").on(table.clientUserId, table.expiresAt), index("idx_grants_agent_created").on(table.agentUserId, table.createdAt)]);
 
 export const securityAuditLog = sqliteTable("security_audit_log", {
@@ -73,3 +84,16 @@ export const privacyRequests = sqliteTable("privacy_requests", {
   resolvedAt: integer("resolved_at"),
   resolvedBy: text("resolved_by"),
 }, table => [index("idx_privacy_user_created").on(table.userId, table.createdAt), index("idx_privacy_status_created").on(table.status, table.createdAt)]);
+
+export const areaSignals = sqliteTable("area_signals", {
+  id: text("id").primaryKey(),
+  title: text("title").notNull(),
+  area: text("area").notNull(),
+  state: text("state").notNull(),
+  category: text("category", { enum: ["New construction", "Redevelopment", "Approval stage", "Construction started"] }).notNull(),
+  detail: text("detail").notNull(),
+  sourceNote: text("source_note").notNull(),
+  eventDate: text("event_date").notNull(),
+  createdAt: integer("created_at").notNull(),
+  createdBy: text("created_by").notNull(),
+}, table => [index("idx_signals_created").on(table.createdAt), index("idx_signals_area").on(table.state, table.area)]);

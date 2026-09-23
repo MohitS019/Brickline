@@ -28,4 +28,19 @@ html{scroll-behavior:smooth}body{background:var(--canvas);color:var(--ink);font-
 .admin-content-card input,.admin-content-card textarea{width:100%;box-sizing:border-box;border:1px solid #d9d0c1;border-radius:5px;padding:11px;font:inherit;font-weight:400;color:#25211d;background:#fff;resize:vertical}
 .admin-content-card .reference-primary{margin-top:auto;justify-content:center}
 .admin-content-card p{margin:0;font-size:12px;color:#38624d}
+.approval-card{width:min(100%,720px)}
+.approval-card textarea,.approval-card input[readonly]{border:1px solid #d7ccbc;padding:11px;font-size:.85rem;font-family:inherit;resize:vertical;background:#fff;color:var(--ink)}
+.approval-card input[readonly]{background:#f7f2e9;color:var(--muted)}
+.admin-verification-details{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;padding:0 15px 14px}
+.admin-verification-details span{background:#f8f3e9;border:1px solid var(--line);padding:9px;min-width:0;color:var(--muted);font-size:.64rem;overflow-wrap:anywhere}
+.admin-verification-details b{display:block;color:var(--ink);font-size:.71rem;margin-bottom:4px}
+.admin-account-actions{flex-wrap:wrap;justify-content:flex-end}
+.admin-account-actions input{border:1px solid var(--line);padding:8px;min-width:210px;font-size:.72rem;color:var(--ink)}
+.signal-editor{max-width:900px;margin-top:18px}
+.manual-source{display:inline-flex;align-items:center;border:1px solid #e0c58f;background:#fff8e8;color:#8c611e;padding:4px 7px;font-size:.6rem;font-weight:800;letter-spacing:.4px;text-transform:uppercase}
+.verified-badge span,.verified-badge small{display:block}
+.verified-badge small{margin-top:3px;color:var(--muted);font-size:.65rem;font-weight:500}
+.area-map-preview iframe,.builder-footprint iframe{width:100%;height:100%;border:0;display:block}
 @media(max-width:1050px){.admin-content-grid{grid-template-columns:1fr}}
+@media(max-width:850px){.admin-verification-details{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:620px){.admin-verification-details{grid-template-columns:1fr}.admin-account-actions{justify-content:flex-start}.admin-account-actions input{min-width:100%;width:100%}}

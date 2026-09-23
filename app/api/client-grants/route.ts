@@ -6,6 +6,7 @@ import { fingerprintSensitive } from "@/lib/sensitive-data";
 
 export const dynamic = "force-dynamic";
 const allowedMinutes = [15, 30, 60, 120];
+const deviceLabel = (userAgent: string) => `${/Mobile|Android|iPhone/i.test(userAgent) ? "Mobile" : "Desktop"} · ${/Edg\//.test(userAgent) ? "Edge" : /Chrome\//.test(userAgent) ? "Chrome" : /Safari\//.test(userAgent) ? "Safari" : /Firefox\//.test(userAgent) ? "Firefox" : "Browser"}`;
 
 export async function GET() {
   const user = await getChatGPTUser();
@@ -18,7 +19,7 @@ export async function GET() {
   if (!admin && (!access?.consentVersion || access.consentWithdrawnAt)) return secureJson({ error: "Privacy consent is required." }, 403);
   const now = Date.now();
   if (access?.agent) {
-    const rows = await db.prepare("SELECT id, client_email AS clientEmail, builder_profile_id AS builderProfileId, expires_at AS expiresAt, created_at AS createdAt, first_opened_at AS firstOpenedAt, revoked_at AS revokedAt, open_count AS openCount FROM client_access_grants WHERE agent_user_id = ? ORDER BY created_at DESC LIMIT 100").bind(user.userId).all();
+    const rows = await db.prepare("SELECT id, client_email AS clientEmail, builder_profile_id AS builderProfileId, expires_at AS expiresAt, created_at AS createdAt, first_opened_at AS firstOpenedAt, revoked_at AS revokedAt, open_count AS openCount, last_opened_at AS lastOpenedAt, last_country AS lastCountry, device_label AS deviceLabel FROM client_access_grants WHERE agent_user_id = ? ORDER BY created_at DESC LIMIT 100").bind(user.userId).all();
     return secureJson({ mode: "agent", grants: rows.results });
   }
   if (access?.client) {
@@ -64,7 +65,7 @@ export async function PATCH(request: Request) {
     if (grant.boundDeviceHash && grant.boundDeviceHash !== deviceHash) { await writeAudit(db, user.userId, "fraud.grant_device_mismatch", grant.id); return secureJson({ error: "This link is bound to another device. Ask the agent for a new link." }, 403); }
     if (grant.lastCountry && country && grant.lastCountry !== country) { await writeAudit(db, user.userId, "fraud.grant_location_change", grant.id, { previousCountry: grant.lastCountry, country }); return secureJson({ error: "Location changed. Re-verification is required through your agent." }, 403); }
     const openedAt = Date.now();
-    await db.prepare("UPDATE client_access_grants SET first_opened_at = COALESCE(first_opened_at, ?), last_opened_at = ?, open_count = open_count + 1, bound_device_hash = COALESCE(bound_device_hash, ?), last_country = COALESCE(?, last_country) WHERE id = ? AND open_count < 5").bind(openedAt, openedAt, deviceHash, country, grant.id).run();
+    await db.prepare("UPDATE client_access_grants SET first_opened_at = COALESCE(first_opened_at, ?), last_opened_at = ?, open_count = open_count + 1, bound_device_hash = COALESCE(bound_device_hash, ?), last_country = COALESCE(?, last_country), device_label = COALESCE(device_label, ?) WHERE id = ? AND open_count < 5").bind(openedAt, openedAt, deviceHash, country, deviceLabel(userAgent), grant.id).run();
     await writeAudit(db, user.userId, "grant.opened", grant.id, { builderProfileId: grant.builderProfileId, openNumber: grant.openCount + 1, country });
     return secureJson({ grant: { id: grant.id, builderProfileId: grant.builderProfileId, expiresAt: grant.expiresAt, openCount: grant.openCount + 1, agentName: grant.agentName } });
   }

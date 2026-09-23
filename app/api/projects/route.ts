@@ -29,8 +29,8 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => null) as Record<string, unknown> | null;
   const text = (key: string, max: number) => typeof body?.[key] === "string" ? String(body[key]).trim().slice(0, max) : "";
   const project = { name: text("name", 160), area: text("area", 120), country: text("country", 120), siteAddress: text("siteAddress", 240), currency: text("currency", 3).toUpperCase(), reraNumber: text("reraNumber", 80), status: text("status", 40) as ProjectStatus, builder: text("builder", 160), description: text("notes", 2000), value: Number(body?.value), homes: Number(body?.homes) };
-  if (!project.name || !project.area || !project.country || !project.builder || !project.description || !/^[A-Z]{3}$/.test(project.currency) || !statuses.includes(project.status) || !Number.isFinite(project.value) || project.value < 0 || !Number.isInteger(project.homes) || project.homes < 0) return secureJson({ error: "Complete all project fields with valid values." }, 400);
-  if (project.country.toLowerCase() === "india" && !project.reraNumber) return secureJson({ error: "RERA registration number is required for Indian projects." }, 400);
+  if (!project.name || !project.area || project.country.toLowerCase() !== "india" || !project.builder || !project.description || !/^[A-Z]{3}$/.test(project.currency) || !statuses.includes(project.status) || !Number.isFinite(project.value) || project.value < 0 || !Number.isInteger(project.homes) || project.homes < 0) return secureJson({ error: "Brickline's MVP accepts valid India project records only." }, 400);
+  if (!project.reraNumber) return secureJson({ error: "RERA registration number is required for every project." }, 400);
   if (project.reraNumber && !/^[A-Za-z0-9/._ -]{3,80}$/.test(project.reraNumber)) return secureJson({ error: "RERA number contains unsupported characters." }, 400);
   const id = crypto.randomUUID(); const now = Date.now(); const encrypted = project.reraNumber ? await encryptSensitive(project.reraNumber) : null;
   const fingerprint = project.reraNumber ? await fingerprintSensitive(project.reraNumber) : null;
