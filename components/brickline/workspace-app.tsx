@@ -54,6 +54,7 @@ export default function WorkspaceApp({ panelAccess, panelContent: initialPanelCo
     const load = window.setTimeout(() => {
       setOpportunities(readStored<Opportunity>("brickline-global-opportunities"));
       setAlerts(readStored<AlertItem>("brickline-global-alerts"));
+      setSavedProjects(new Set(readStored<string>("brickline-india-saved-projects")));
       const savedRole = localStorage.getItem("brickline-global-role");
       if ((savedRole === "Agent" || savedRole === "Builder" || savedRole === "Client") && panelAccess.allowedRoles.includes(savedRole)) {
         setRole(savedRole);
@@ -75,6 +76,7 @@ export default function WorkspaceApp({ panelAccess, panelContent: initialPanelCo
   useEffect(() => { if (hydrated) localStorage.setItem("brickline-global-opportunities", JSON.stringify(opportunities)); }, [opportunities, hydrated]);
   useEffect(() => { if (hydrated) localStorage.setItem("brickline-global-alerts", JSON.stringify(alerts)); }, [alerts, hydrated]);
   useEffect(() => { if (hydrated) localStorage.setItem("brickline-global-role", role); }, [role, hydrated]);
+  useEffect(() => { if (hydrated) localStorage.setItem("brickline-india-saved-projects", JSON.stringify([...savedProjects])); }, [savedProjects, hydrated]);
 
   const navigate = (next: ViewId) => { if (next === "admin" && !panelAccess.isAdmin) return; setView(next); window.scrollTo({ top: 0, behavior: "smooth" }); };
   const changeRole = (next: Role) => { if (!panelAccess.allowedRoles.includes(next)) return; setRole(next); setProjectId(null); setForm(null); navigate(next === "Agent" ? "map" : "client-access"); };
@@ -122,7 +124,9 @@ export default function WorkspaceApp({ panelAccess, panelContent: initialPanelCo
 
   return <><AppShell view={view} role={role} allowedRoles={panelAccess.allowedRoles} isAdmin={panelAccess.isAdmin} mobileOpen={mobileOpen} unread={alerts.filter(alert => !alert.read).length} onNavigate={navigate} onRoleChange={changeRole} onMobileToggle={() => setMobileOpen(!mobileOpen)} onSearch={() => setSearchOpen(true)}>{content}</AppShell>
     {searchOpen && <GlobalSearch items={projects} query={query} setQuery={setQuery} onClose={() => { setSearchOpen(false); setQuery(""); }} onNavigate={navigate} onProject={setProjectId}/>}
-    {projectId && <ProjectDetail id={projectId} items={projects} role={role} saved={savedProjects.has(projectId)} onClose={() => setProjectId(null)} onSave={() => toggleSet(setSavedProjects, projectId, "Project saved", "Project removed from saved")} onNotify={notify} onOpportunity={() => { setProjectId(null); navigate("marketplace"); }}/>}
+    {projectId && (
+      <ProjectDetail key={projectId} id={projectId} items={projects} signals={areaSignals} role={role} saved={savedProjects.has(projectId)} onClose={() => setProjectId(null)} onSave={() => toggleSet(setSavedProjects, projectId, "Project saved", "Project removed from saved")} onNotify={notify} onProject={setProjectId} onContact={recipient => { setMessageRecipient(recipient); setForm("message"); }} onOpenArea={() => { setProjectId(null); navigate("areas"); }}/>
+    )}
     {form && <SimpleFormModal kind={form} recipient={form === "message" ? messageRecipient : ""} initialArea={formArea} onClose={() => { setForm(null); setMessageRecipient(""); setFormArea(""); }} onSubmit={handleForm}/>}
     {toast && <Toast message={toast} onClose={() => setToast("")}/>}
   </>;

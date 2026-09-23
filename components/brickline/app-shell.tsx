@@ -6,6 +6,7 @@ import type { Role, ViewId } from "@/lib/brickline-data";
 
 const primary: { id: ViewId; label: string }[] = [
   { id: "client-access", label: "My panel" },
+  { id: "overview", label: "Dashboard" },
   { id: "map", label: "Explore map" },
   { id: "projects", label: "Projects" },
   { id: "network", label: "Builders" },
