@@ -13,6 +13,10 @@ export const builderAccessRequests = sqliteTable("builder_access_requests", {
   requestedAt: integer("requested_at").notNull(),
   reviewedAt: integer("reviewed_at"),
   reviewedBy: text("reviewed_by"),
+  consentVersion: text("consent_version").notNull().default(""),
+  consentAt: integer("consent_at"),
+  consentWithdrawnAt: integer("consent_withdrawn_at"),
+  deletionRequestedAt: integer("deletion_requested_at"),
 });
 
 export const panelContent = sqliteTable("panel_content", {
@@ -34,6 +38,10 @@ export const clientAccessGrants = sqliteTable("client_access_grants", {
   createdAt: integer("created_at").notNull(),
   firstOpenedAt: integer("first_opened_at"),
   revokedAt: integer("revoked_at"),
+  openCount: integer("open_count").notNull().default(0),
+  boundDeviceHash: text("bound_device_hash"),
+  lastOpenedAt: integer("last_opened_at"),
+  lastCountry: text("last_country"),
 }, table => [index("idx_grants_client_expiry").on(table.clientUserId, table.expiresAt), index("idx_grants_agent_created").on(table.agentUserId, table.createdAt)]);
 
 export const securityAuditLog = sqliteTable("security_audit_log", {
@@ -49,6 +57,19 @@ export const registeredProjects = sqliteTable("registered_projects", {
   id: text("id").primaryKey(), ownerUserId: text("owner_user_id").notNull(), name: text("name").notNull(),
   area: text("area").notNull(), country: text("country").notNull(), siteAddress: text("site_address"), currency: text("currency").notNull(),
   reraEncrypted: text("rera_encrypted"), status: text("status").notNull(), builder: text("builder").notNull(),
+  reraFingerprint: text("rera_fingerprint"),
   value: integer("value").notNull(), homes: integer("homes").notNull(), description: text("description").notNull(),
   createdAt: integer("created_at").notNull(), updatedAt: integer("updated_at").notNull(),
-}, table => [index("idx_projects_owner_updated").on(table.ownerUserId, table.updatedAt), index("idx_projects_country_status").on(table.country, table.status)]);
+}, table => [index("idx_projects_owner_updated").on(table.ownerUserId, table.updatedAt), index("idx_projects_country_status").on(table.country, table.status), index("idx_projects_rera_fingerprint").on(table.reraFingerprint)]);
+
+export const privacyRequests = sqliteTable("privacy_requests", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  email: text("email").notNull(),
+  requestType: text("request_type", { enum: ["deletion", "correction", "export"] }).notNull(),
+  details: text("details").notNull().default(""),
+  status: text("status", { enum: ["pending", "completed", "rejected"] }).notNull().default("pending"),
+  createdAt: integer("created_at").notNull(),
+  resolvedAt: integer("resolved_at"),
+  resolvedBy: text("resolved_by"),
+}, table => [index("idx_privacy_user_created").on(table.userId, table.createdAt), index("idx_privacy_status_created").on(table.status, table.createdAt)]);

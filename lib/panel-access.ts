@@ -10,6 +10,7 @@ export type PanelAccess = {
   requestedRole: Role | null;
   allowedRoles: Role[];
   email: string | null;
+  needsConsent: boolean;
 };
 
 export function isBricklineAdmin(user: ChatGPTUser): boolean {
@@ -24,20 +25,21 @@ export function getPanelDb(): D1Database | null {
 
 export async function getPanelAccess(): Promise<PanelAccess> {
   const user = await getChatGPTUser();
-  if (!user) return { mode: "signed-out", isAdmin: false, status: null, requestedRole: null, allowedRoles: [], email: null };
-  if (isBricklineAdmin(user)) return { mode: "member", isAdmin: true, status: "approved", requestedRole: null, allowedRoles: ["Agent", "Builder", "Client"], email: user.email };
+  if (!user) return { mode: "signed-out", isAdmin: false, status: null, requestedRole: null, allowedRoles: [], email: null, needsConsent: false };
+  if (isBricklineAdmin(user)) return { mode: "member", isAdmin: true, status: "approved", requestedRole: null, allowedRoles: ["Agent", "Builder", "Client"], email: user.email, needsConsent: false };
   const db = getPanelDb();
-  if (!db) return { mode: "unavailable", isAdmin: false, status: null, requestedRole: null, allowedRoles: [], email: user.email };
+  if (!db) return { mode: "unavailable", isAdmin: false, status: null, requestedRole: null, allowedRoles: [], email: user.email, needsConsent: false };
   try {
-    const row = await db.prepare("SELECT status, requested_role AS requestedRole, agent_access AS agentAccess, builder_access AS builderAccess, client_access AS clientAccess FROM builder_access_requests WHERE user_id = ?")
-      .bind(user.userId).first<{ status: AccessStatus; requestedRole: Role; agentAccess: number; builderAccess: number; clientAccess: number }>();
+    const row = await db.prepare("SELECT status, requested_role AS requestedRole, agent_access AS agentAccess, builder_access AS builderAccess, client_access AS clientAccess, consent_version AS consentVersion, consent_withdrawn_at AS consentWithdrawnAt FROM builder_access_requests WHERE user_id = ?")
+      .bind(user.userId).first<{ status: AccessStatus; requestedRole: Role; agentAccess: number; builderAccess: number; clientAccess: number; consentVersion: string; consentWithdrawnAt: number | null }>();
     const allowedRoles: Role[] = row?.status === "approved" ? [
       ...(row.agentAccess ? ["Agent" as const] : []),
       ...(row.builderAccess ? ["Builder" as const] : []),
       ...(row.clientAccess ? ["Client" as const] : []),
     ] : [];
-    return { mode: "member", isAdmin: false, status: row?.status ?? null, requestedRole: row?.requestedRole ?? null, allowedRoles, email: user.email };
+    const needsConsent = Boolean(row?.status === "approved" && (!row.consentVersion || row.consentWithdrawnAt));
+    return { mode: "member", isAdmin: false, status: row?.status ?? null, requestedRole: row?.requestedRole ?? null, allowedRoles, email: user.email, needsConsent };
   } catch {
-    return { mode: "unavailable", isAdmin: false, status: null, requestedRole: null, allowedRoles: [], email: user.email };
+    return { mode: "unavailable", isAdmin: false, status: null, requestedRole: null, allowedRoles: [], email: user.email, needsConsent: false };
   }
 }

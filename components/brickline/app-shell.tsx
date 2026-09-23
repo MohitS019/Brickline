@@ -48,7 +48,7 @@ export function AppShell({ children, view, role, allowedRoles, isAdmin, mobileOp
       </div>
     </header>
     {mobileOpen && <nav className="site-mobile-nav" aria-label="Mobile navigation">{[...primaryItems, ...secondary].map(item => <button key={item.id} className={view === item.id ? "active" : ""} onClick={() => go(item.id)}>{item.label}</button>)}<div className="mobile-role-choice">{allowedRoles.map(option => <button key={option} className={role === option ? "active" : ""} onClick={() => onRoleChange(option)}>{option}</button>)}</div></nav>}
-    <div className="site-subnav"><span>REAL-ESTATE INTELLIGENCE</span><span>GLOBAL PLATFORM <b>·</b> {primaryItems.find(item => item.id === view)?.label || secondary.find(item => item.id === view)?.label || "Overview"}</span><div>{secondary.map(item => <button key={item.id} className={view === item.id ? "active" : ""} onClick={() => go(item.id)}>{item.label}</button>)}</div></div>
+    <div className="site-subnav"><span>REAL-ESTATE INTELLIGENCE</span><span>GLOBAL PLATFORM <b>·</b> {primaryItems.find(item => item.id === view)?.label || secondary.find(item => item.id === view)?.label || "Overview"}</span><div>{secondary.map(item => <button key={item.id} className={view === item.id ? "active" : ""} onClick={() => go(item.id)}>{item.label}</button>)}<a href="/privacy">Privacy</a></div></div>
     <section className="content site-content">{children}</section>
   </main>;
 }

@@ -101,7 +101,7 @@ export default function WorkspaceApp({ panelAccess, panelContent: initialPanelCo
   };
 
   if (!hydrated) return <div className="approval-shell"><div className="approval-brand">Brick<span>line.</span></div></div>;
-  if (!panelAccess.isAdmin && (panelAccess.status !== "approved" || !panelAccess.allowedRoles.length)) return <PanelAccessGate access={panelAccess}/>;
+  if (!panelAccess.isAdmin && (panelAccess.needsConsent || panelAccess.status !== "approved" || !panelAccess.allowedRoles.length)) return <PanelAccessGate access={panelAccess}/>;
 
   let content: React.ReactNode;
   switch (view) {

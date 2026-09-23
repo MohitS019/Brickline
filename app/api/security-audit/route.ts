@@ -12,6 +12,7 @@ export async function GET() {
   try {
     const events = await db.prepare("SELECT l.id, l.actor_user_id AS actorUserId, COALESCE(r.email, l.actor_user_id) AS actor, l.event_type AS eventType, l.target_id AS targetId, l.metadata, l.created_at AS createdAt FROM security_audit_log l LEFT JOIN builder_access_requests r ON r.user_id = l.actor_user_id ORDER BY l.created_at DESC LIMIT 200").all();
     const unusual = await db.prepare("SELECT l.actor_user_id AS actorUserId, COALESCE(r.email, l.actor_user_id) AS actor, COUNT(*) AS count FROM security_audit_log l LEFT JOIN builder_access_requests r ON r.user_id = l.actor_user_id WHERE l.event_type = 'grant.created' AND l.created_at >= ? GROUP BY l.actor_user_id HAVING COUNT(*) >= 10 ORDER BY count DESC").bind(Date.now() - 60 * 60 * 1000).all();
-    return secureJson({ events: events.results, alerts: unusual.results });
+    const fraud = await db.prepare("SELECT l.id, COALESCE(r.email, l.actor_user_id) AS actor, l.event_type AS eventType, l.target_id AS targetId, l.created_at AS createdAt FROM security_audit_log l LEFT JOIN builder_access_requests r ON r.user_id = l.actor_user_id WHERE l.event_type LIKE 'fraud.%' ORDER BY l.created_at DESC LIMIT 50").all();
+    return secureJson({ events: events.results, alerts: unusual.results, fraudAlerts: fraud.results });
   } catch { return secureJson({ error: "Audit activity could not be loaded." }, 503); }
 }

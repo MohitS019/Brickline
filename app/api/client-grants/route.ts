@@ -2,6 +2,7 @@ import { getChatGPTUser } from "@/app/chatgpt-auth";
 import { isBricklineAdmin, getPanelDb } from "@/lib/panel-access";
 import { isRateLimited, requireVerifiedRole, secureJson, validateMutationOrigin, writeAudit } from "@/lib/api-security";
 import { createGrantToken, verifyGrantToken } from "@/lib/grant-token";
+import { fingerprintSensitive } from "@/lib/sensitive-data";
 
 export const dynamic = "force-dynamic";
 const allowedMinutes = [15, 30, 60, 120];
@@ -12,15 +13,16 @@ export async function GET() {
   const db = getPanelDb();
   if (!db) return secureJson({ error: "Access grants are unavailable." }, 503);
   const admin = isBricklineAdmin(user);
-  const access: { status: string; agent: number | boolean; client: number | boolean } | null = admin ? { status: "approved", agent: true, client: true } : await db.prepare("SELECT status, agent_access AS agent, client_access AS client FROM builder_access_requests WHERE user_id = ?").bind(user.userId).first<{ status: string; agent: number; client: number }>() || null;
+  const access: { status: string; agent: number | boolean; client: number | boolean; consentVersion?: string; consentWithdrawnAt?: number | null } | null = admin ? { status: "approved", agent: true, client: true } : await db.prepare("SELECT status, agent_access AS agent, client_access AS client, consent_version AS consentVersion, consent_withdrawn_at AS consentWithdrawnAt FROM builder_access_requests WHERE user_id = ?").bind(user.userId).first<{ status: string; agent: number; client: number; consentVersion: string; consentWithdrawnAt: number | null }>() || null;
   if (!admin && access?.status !== "approved") return secureJson({ error: "Verified account required." }, 403);
+  if (!admin && (!access?.consentVersion || access.consentWithdrawnAt)) return secureJson({ error: "Privacy consent is required." }, 403);
   const now = Date.now();
   if (access?.agent) {
-    const rows = await db.prepare("SELECT id, client_email AS clientEmail, builder_profile_id AS builderProfileId, expires_at AS expiresAt, created_at AS createdAt, first_opened_at AS firstOpenedAt, revoked_at AS revokedAt FROM client_access_grants WHERE agent_user_id = ? ORDER BY created_at DESC LIMIT 100").bind(user.userId).all();
+    const rows = await db.prepare("SELECT id, client_email AS clientEmail, builder_profile_id AS builderProfileId, expires_at AS expiresAt, created_at AS createdAt, first_opened_at AS firstOpenedAt, revoked_at AS revokedAt, open_count AS openCount FROM client_access_grants WHERE agent_user_id = ? ORDER BY created_at DESC LIMIT 100").bind(user.userId).all();
     return secureJson({ mode: "agent", grants: rows.results });
   }
   if (access?.client) {
-    const rows = await db.prepare("SELECT id, builder_profile_id AS builderProfileId, expires_at AS expiresAt, created_at AS createdAt, first_opened_at AS firstOpenedAt FROM client_access_grants WHERE client_user_id = ? AND revoked_at IS NULL AND expires_at > ? ORDER BY created_at DESC LIMIT 100").bind(user.userId, now).all();
+    const rows = await db.prepare("SELECT g.id, g.builder_profile_id AS builderProfileId, g.expires_at AS expiresAt, g.created_at AS createdAt, g.first_opened_at AS firstOpenedAt, g.open_count AS openCount, COALESCE(a.name, 'Brickline agent') AS agentName FROM client_access_grants g LEFT JOIN builder_access_requests a ON a.user_id = g.agent_user_id WHERE g.client_user_id = ? AND g.revoked_at IS NULL AND g.expires_at > ? ORDER BY g.created_at DESC LIMIT 100").bind(user.userId, now).all();
     return secureJson({ mode: "client", grants: rows.results });
   }
   return secureJson({ error: "Agent or Client access required." }, 403);
@@ -52,11 +54,19 @@ export async function PATCH(request: Request) {
   if (body?.action === "open" && typeof body.token === "string") {
     const claims = await verifyGrantToken(body.token);
     if (!claims || claims.sub !== user.userId || claims.exp * 1000 <= Date.now()) return secureJson({ error: "This secure link is invalid or expired." }, 403);
-    const grant = await db.prepare("SELECT id, builder_profile_id AS builderProfileId, expires_at AS expiresAt, revoked_at AS revokedAt FROM client_access_grants WHERE id = ? AND client_user_id = ? AND agent_user_id = ?").bind(claims.jti, user.userId, claims.aid).first<{ id: string; builderProfileId: string; expiresAt: number; revokedAt: number | null }>();
+    const grant = await db.prepare("SELECT g.id, g.builder_profile_id AS builderProfileId, g.expires_at AS expiresAt, g.revoked_at AS revokedAt, g.open_count AS openCount, g.bound_device_hash AS boundDeviceHash, g.last_country AS lastCountry, COALESCE(a.name, 'Brickline agent') AS agentName FROM client_access_grants g LEFT JOIN builder_access_requests a ON a.user_id = g.agent_user_id WHERE g.id = ? AND g.client_user_id = ? AND g.agent_user_id = ?").bind(claims.jti, user.userId, claims.aid).first<{ id: string; builderProfileId: string; expiresAt: number; revokedAt: number | null; openCount: number; boundDeviceHash: string | null; lastCountry: string | null; agentName: string }>();
     if (!grant || grant.revokedAt || grant.expiresAt <= Date.now() || grant.builderProfileId !== claims.bid) return secureJson({ error: "This access grant is no longer active." }, 403);
-    await db.prepare("UPDATE client_access_grants SET first_opened_at = COALESCE(first_opened_at, ?) WHERE id = ?").bind(Date.now(), grant.id).run();
-    await writeAudit(db, user.userId, "grant.opened", grant.id, { builderProfileId: grant.builderProfileId });
-    return secureJson({ grant: { id: grant.id, builderProfileId: grant.builderProfileId, expiresAt: grant.expiresAt } });
+    if (grant.openCount >= 5) { await writeAudit(db, user.userId, "fraud.grant_open_limit", grant.id); return secureJson({ error: "This secure link has reached its five-open limit." }, 429); }
+    const userAgent = request.headers.get("user-agent") || "unknown-browser";
+    const language = request.headers.get("accept-language") || "unknown-language";
+    const deviceHash = await fingerprintSensitive(`${userAgent}|${language}`);
+    const country = (request.headers.get("cf-ipcountry") || "").slice(0, 2).toUpperCase() || null;
+    if (grant.boundDeviceHash && grant.boundDeviceHash !== deviceHash) { await writeAudit(db, user.userId, "fraud.grant_device_mismatch", grant.id); return secureJson({ error: "This link is bound to another device. Ask the agent for a new link." }, 403); }
+    if (grant.lastCountry && country && grant.lastCountry !== country) { await writeAudit(db, user.userId, "fraud.grant_location_change", grant.id, { previousCountry: grant.lastCountry, country }); return secureJson({ error: "Location changed. Re-verification is required through your agent." }, 403); }
+    const openedAt = Date.now();
+    await db.prepare("UPDATE client_access_grants SET first_opened_at = COALESCE(first_opened_at, ?), last_opened_at = ?, open_count = open_count + 1, bound_device_hash = COALESCE(bound_device_hash, ?), last_country = COALESCE(?, last_country) WHERE id = ? AND open_count < 5").bind(openedAt, openedAt, deviceHash, country, grant.id).run();
+    await writeAudit(db, user.userId, "grant.opened", grant.id, { builderProfileId: grant.builderProfileId, openNumber: grant.openCount + 1, country });
+    return secureJson({ grant: { id: grant.id, builderProfileId: grant.builderProfileId, expiresAt: grant.expiresAt, openCount: grant.openCount + 1, agentName: grant.agentName } });
   }
   if (body?.action === "revoke" && typeof body.grantId === "string") {
     const auth = await requireVerifiedRole("Agent"); if ("response" in auth) return auth.response;

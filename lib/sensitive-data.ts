@@ -16,3 +16,10 @@ export async function decryptSensitive(value: string) {
   const [iv, encrypted] = value.split(".");
   return decoder.decode(await crypto.subtle.decrypt({ name: "AES-GCM", iv: unpack(iv) }, await key(), unpack(encrypted)));
 }
+
+export async function fingerprintSensitive(value: string) {
+  if (!secret()) throw new Error("Sensitive-data fingerprinting unavailable");
+  const signingKey = await crypto.subtle.importKey("raw", encoder.encode(secret()), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const signature = new Uint8Array(await crypto.subtle.sign("HMAC", signingKey, encoder.encode(value.trim().toUpperCase().replace(/\s+/g, ""))));
+  return Array.from(signature, byte => byte.toString(16).padStart(2, "0")).join("");
+}

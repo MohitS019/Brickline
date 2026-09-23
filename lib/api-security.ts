@@ -20,8 +20,9 @@ export async function requireVerifiedRole(role: Role): Promise<{ user: ChatGPTUs
   if (!db) return { response: secureJson({ error: "Security service is unavailable." }, 503) };
   if (isBricklineAdmin(user)) return { user, db };
   const column = role === "Agent" ? "agent_access" : role === "Builder" ? "builder_access" : "client_access";
-  const row = await db.prepare(`SELECT status, ${column} AS allowed FROM builder_access_requests WHERE user_id = ?`).bind(user.userId).first<{ status: string; allowed: number }>();
+  const row = await db.prepare(`SELECT status, ${column} AS allowed, consent_version AS consentVersion, consent_withdrawn_at AS consentWithdrawnAt FROM builder_access_requests WHERE user_id = ?`).bind(user.userId).first<{ status: string; allowed: number; consentVersion: string; consentWithdrawnAt: number | null }>();
   if (!row || row.status !== "approved" || !row.allowed) return { response: secureJson({ error: `${role} verification is required.` }, 403) };
+  if (!row.consentVersion || row.consentWithdrawnAt) return { response: secureJson({ error: "Privacy consent is required before using this panel." }, 403) };
   return { user, db };
 }
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Clock3, LockKeyhole, RefreshCw } from "lucide-react";
+import { Clock3, LockKeyhole, RefreshCw, ShieldCheck } from "lucide-react";
 import type { PanelAccess } from "@/lib/panel-access";
 import type { Role } from "@/lib/brickline-data";
 
@@ -11,11 +11,12 @@ export function PanelAccessGate({ access }: { access: PanelAccess }) {
   const [status, setStatus] = useState(access.status);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [consent, setConsent] = useState(false);
 
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault(); setBusy(true); setError("");
     try {
-      const response = await fetch("/api/panel-access", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ role, company }) });
+      const response = await fetch("/api/panel-access", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ role, company, consent }) });
       const result = await response.json() as { error?: string; status?: "pending" };
       if (!response.ok) throw new Error(result.error || "Could not send request.");
       setStatus("pending");
@@ -23,13 +24,24 @@ export function PanelAccessGate({ access }: { access: PanelAccess }) {
     finally { setBusy(false); }
   };
 
+  const acceptConsent = async () => {
+    setBusy(true); setError("");
+    try {
+      const response = await fetch("/api/privacy", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "consent" }) });
+      const result = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(result.error || "Could not save consent.");
+      location.reload();
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not save consent."); setBusy(false); }
+  };
+
   return <main className="approval-shell"><div className="approval-brand">Brick<span>line.</span></div><section className="approval-card"><div className="approval-icon"><LockKeyhole size={26}/></div><span className="micro-label">PANEL ACCESS</span>
     {access.mode === "signed-out" ? <><h1>Sign in to continue.</h1><p>Each panel is linked to a signed-in account so the admin can manage access.</p><a className="reference-primary" href="/signin-with-chatgpt?return_to=%2F" target="_top">Sign in with ChatGPT</a></> :
     access.mode === "unavailable" ? <><h1>Access check unavailable.</h1><p>We cannot confirm your permissions right now. Please try again shortly.</p><button className="reference-primary" onClick={() => location.reload()}><RefreshCw size={15}/>Retry</button></> :
+    access.needsConsent ? <><h1>Review privacy choices.</h1><p>Before using protected panels, accept the current privacy notice for account verification, projects, secure introductions, fraud prevention, and audit records.</p><div className="approval-status"><ShieldCheck size={18}/> No marketing consent included</div><label className="consent-choice"><input type="checkbox" checked={consent} onChange={event => setConsent(event.target.checked)}/><span>I have read the <a href="/privacy">Privacy Notice</a> and consent to the stated product-data processing.</span></label>{error && <p className="access-error" role="alert">{error}</p>}<button className="reference-primary" disabled={!consent || busy} onClick={acceptConsent}>{busy ? "Saving…" : "Accept and enter"}</button></> :
     status === "pending" ? <><h1>Request sent for review.</h1><p>An admin will review your {role.toLowerCase()} request. Your panels open after approval.</p><div className="approval-status"><Clock3 size={18}/> Pending admin decision</div><button className="reference-primary" onClick={() => location.reload()}><RefreshCw size={15}/>Check status</button></> :
     status === "suspended" ? <><h1>Access is suspended.</h1><p>An admin has paused your panel access. Contact the site owner if you think this is a mistake.</p><button className="reference-primary" onClick={() => location.reload()}><RefreshCw size={15}/>Check status</button></> :
     status === "approved" ? <><h1>No panels assigned.</h1><p>Your account is approved, but no panels are currently enabled. Ask an admin to grant access.</p><button className="reference-primary" onClick={() => location.reload()}><RefreshCw size={15}/>Check status</button></> :
-    <><h1>{status === "declined" ? "Your request was declined." : "Request access."}</h1><p>{status === "declined" ? "You can update your profession and submit a new request." : "Choose your profession. An admin will decide which panels you can open."}</p><form onSubmit={submit}><label>Profession<select value={role} onChange={event => setRole(event.target.value as Role)}><option value="Agent">Real-estate agent</option><option value="Builder">Builder / developer</option><option value="Client">Client</option></select></label>{role === "Builder" && <label>Company name<input value={company} onChange={event => setCompany(event.target.value)} minLength={2} maxLength={120} required placeholder="Your building company"/></label>}{error && <p className="access-error" role="alert">{error}</p>}<button className="reference-primary" disabled={busy}>{busy ? "Sending…" : "Request access"}</button></form></>}
+    <><h1>{status === "declined" ? "Your request was declined." : "Request access."}</h1><p>{status === "declined" ? "You can update your profession and submit a new request." : "Choose your profession. An admin will decide which panels you can open."}</p><form onSubmit={submit}><label>Profession<select value={role} onChange={event => setRole(event.target.value as Role)}><option value="Agent">Real-estate agent</option><option value="Builder">Builder / developer</option><option value="Client">Client</option></select></label>{role === "Builder" && <label>Company name<input value={company} onChange={event => setCompany(event.target.value)} minLength={2} maxLength={120} required placeholder="Your building company"/></label>}<label className="consent-choice"><input type="checkbox" checked={consent} onChange={event => setConsent(event.target.checked)} required/><span>I have read the <a href="/privacy">Privacy Notice</a> and consent to account, role, project, secure-sharing, fraud-prevention, and audit processing.</span></label>{error && <p className="access-error" role="alert">{error}</p>}<button className="reference-primary" disabled={busy || !consent}>{busy ? "Sending…" : "Request access"}</button></form></>}
     <small>Signed in as {access.email || "a guest"}</small>
   </section></main>;
 }

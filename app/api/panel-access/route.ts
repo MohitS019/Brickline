@@ -33,16 +33,19 @@ export async function POST(request: Request) {
   if (isBricklineAdmin(user)) return json({ error: "Admin access is already granted." }, 409);
   const db = getPanelDb();
   if (!db) return json({ error: "Panel access is temporarily unavailable." }, 503);
-  const body = await request.json().catch(() => null) as { role?: unknown; company?: unknown } | null;
+  const body = await request.json().catch(() => null) as { role?: unknown; company?: unknown; consent?: unknown } | null;
   const role = body?.role;
   const company = typeof body?.company === "string" ? body.company.trim() : "";
   if (!roles.includes(role as Role) || (role === "Builder" && company.length < 2) || company.length > 120) return json({ error: "Choose a profession and enter a valid company name for Builder access." }, 400);
+  if (body?.consent !== true) return json({ error: "Accept the Privacy Notice before requesting access." }, 400);
   try {
     if (await isRateLimited(db, user.userId, "access.requested", 60 * 60 * 1000, 5)) return json({ error: "Too many access requests. Try again later." }, 429);
     const existing = await db.prepare("SELECT status FROM builder_access_requests WHERE user_id = ?").bind(user.userId).first<{ status: string }>();
     if (existing && existing.status !== "declined") return json({ error: existing.status === "pending" ? "Your request is already pending." : "Your access is managed by an admin." }, 409);
-    await db.prepare("INSERT INTO builder_access_requests (user_id, email, name, company, status, requested_role, agent_access, builder_access, client_access, requested_at, reviewed_at, reviewed_by) VALUES (?, ?, ?, ?, 'pending', ?, 0, 0, 0, ?, NULL, NULL) ON CONFLICT(user_id) DO UPDATE SET email = excluded.email, name = excluded.name, company = excluded.company, status = 'pending', requested_role = excluded.requested_role, agent_access = 0, builder_access = 0, client_access = 0, requested_at = excluded.requested_at, reviewed_at = NULL, reviewed_by = NULL")
-      .bind(user.userId, user.email, user.displayName, company, role, Date.now()).run();
+    const now = Date.now();
+    await db.prepare("INSERT INTO builder_access_requests (user_id, email, name, company, status, requested_role, agent_access, builder_access, client_access, requested_at, reviewed_at, reviewed_by, consent_version, consent_at, consent_withdrawn_at) VALUES (?, ?, ?, ?, 'pending', ?, 0, 0, 0, ?, NULL, NULL, '2026-09-23', ?, NULL) ON CONFLICT(user_id) DO UPDATE SET email = excluded.email, name = excluded.name, company = excluded.company, status = 'pending', requested_role = excluded.requested_role, agent_access = 0, builder_access = 0, client_access = 0, requested_at = excluded.requested_at, reviewed_at = NULL, reviewed_by = NULL, consent_version = excluded.consent_version, consent_at = excluded.consent_at, consent_withdrawn_at = NULL")
+      .bind(user.userId, user.email, user.displayName, company, role, now, now).run();
+    await writeAudit(db, user.userId, "privacy.consent", user.userId, { version: "2026-09-23" });
     await writeAudit(db, user.userId, "access.requested", user.userId, { role });
     return json({ status: "pending" }, 201);
   } catch {
