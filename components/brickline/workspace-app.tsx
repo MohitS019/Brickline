@@ -396,6 +396,15 @@ export default function WorkspaceApp({
             panelAccess.allowedRoles.length === 3
           }
           onNavigate={navigate}
+          onProject={setProjectId}
+          onProjectsChange={(changed) =>
+            setProjects((current) =>
+              current.map((project) =>
+                project.id === changed.id ? changed : project,
+              ),
+            )
+          }
+          onOpenIntroductions={() => changeRole("Agent")}
         />
       );
       break;
