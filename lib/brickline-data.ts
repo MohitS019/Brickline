@@ -6,7 +6,7 @@ export interface Project {
   id: string; name: string; area: string; country?: string; siteAddress?: string; currency?: string; reraNumber?: string;
   status: ProjectStatus; builder: string; value: number; homes: number; completion: string;
   confidence: number; updated: string; description: string; tags: string[];
-  coordinates: { x: number; y: number };
+  coordinates: { latitude?: number; longitude?: number };
 }
 
 export interface NetworkMember {

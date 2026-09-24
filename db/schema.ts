@@ -1,4 +1,4 @@
-import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { index, integer, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 export const builderAccessRequests = sqliteTable("builder_access_requests", {
   userId: text("user_id").primaryKey(),
@@ -67,6 +67,7 @@ export const securityAuditLog = sqliteTable("security_audit_log", {
 export const registeredProjects = sqliteTable("registered_projects", {
   id: text("id").primaryKey(), ownerUserId: text("owner_user_id").notNull(), name: text("name").notNull(),
   area: text("area").notNull(), country: text("country").notNull(), siteAddress: text("site_address"), currency: text("currency").notNull(),
+  latitude: real("latitude"), longitude: real("longitude"),
   reraEncrypted: text("rera_encrypted"), status: text("status").notNull(), builder: text("builder").notNull(),
   reraFingerprint: text("rera_fingerprint"),
   value: integer("value").notNull(), homes: integer("homes").notNull(), description: text("description").notNull(),

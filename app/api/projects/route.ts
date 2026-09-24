@@ -2,11 +2,12 @@ import { getChatGPTUser } from "@/app/chatgpt-auth";
 import { getPanelDb, isBricklineAdmin } from "@/lib/panel-access";
 import { isRateLimited, requireVerifiedRole, secureJson, validateMutationOrigin, writeAudit } from "@/lib/api-security";
 import { decryptSensitive, encryptSensitive, fingerprintSensitive } from "@/lib/sensitive-data";
+import { geocodeIndiaProject } from "@/lib/geocoding";
 import type { ProjectStatus } from "@/lib/brickline-data";
 
 export const dynamic = "force-dynamic";
 const statuses: ProjectStatus[] = ["New construction", "Redevelopment", "Approval stage", "Construction started"];
-type ProjectRow = { id: string; ownerUserId: string; name: string; area: string; country: string; siteAddress: string | null; currency: string; reraEncrypted: string | null; status: ProjectStatus; builder: string; value: number; homes: number; description: string; updatedAt: number };
+type ProjectRow = { id: string; ownerUserId: string; name: string; area: string; country: string; siteAddress: string | null; currency: string; reraEncrypted: string | null; status: ProjectStatus; builder: string; value: number; homes: number; description: string; latitude: number | null; longitude: number | null; updatedAt: number };
 
 export async function GET() {
   const user = await getChatGPTUser(); if (!user) return secureJson({ error: "Sign in is required." }, 401);
@@ -17,8 +18,8 @@ export async function GET() {
     if (!access || access.status !== "approved" || !(access.agent || access.builder || access.client)) return secureJson({ error: "Verified account required." }, 403);
     if (!access.consentVersion || access.consentWithdrawnAt) return secureJson({ error: "Privacy consent is required." }, 403);
   }
-  const rows = await db.prepare("SELECT id, owner_user_id AS ownerUserId, name, area, country, site_address AS siteAddress, currency, rera_encrypted AS reraEncrypted, status, builder, value, homes, description, updated_at AS updatedAt FROM registered_projects ORDER BY updated_at DESC LIMIT 500").all<ProjectRow>();
-  const projects = await Promise.all(rows.results.map(async row => ({ id: row.id, name: row.name, area: row.area, country: row.country, siteAddress: row.siteAddress || undefined, currency: row.currency, reraNumber: row.reraEncrypted && (admin || row.ownerUserId === user.userId) ? await decryptSensitive(row.reraEncrypted) : undefined, status: row.status, builder: row.builder, value: row.value, homes: row.homes, completion: "Not scheduled", confidence: 100, updated: "Registered", description: row.description, tags: ["Verified account submission"], coordinates: { x: 50, y: 50 } })));
+  const rows = await db.prepare("SELECT id, owner_user_id AS ownerUserId, name, area, country, site_address AS siteAddress, currency, rera_encrypted AS reraEncrypted, status, builder, value, homes, description, latitude, longitude, updated_at AS updatedAt FROM registered_projects ORDER BY updated_at DESC LIMIT 500").all<ProjectRow>();
+  const projects = await Promise.all(rows.results.map(async row => ({ id: row.id, name: row.name, area: row.area, country: row.country, siteAddress: row.siteAddress || undefined, currency: row.currency, reraNumber: row.reraEncrypted && (admin || row.ownerUserId === user.userId) ? await decryptSensitive(row.reraEncrypted) : undefined, status: row.status, builder: row.builder, value: row.value, homes: row.homes, completion: "Not scheduled", confidence: 100, updated: "Registered", description: row.description, tags: ["Verified account submission"], coordinates: { latitude: row.latitude ?? undefined, longitude: row.longitude ?? undefined } })));
   return secureJson({ projects });
 }
 
@@ -43,7 +44,8 @@ export async function POST(request: Request) {
     const duplicate = await auth.db.prepare("SELECT id, owner_user_id AS ownerUserId FROM registered_projects WHERE rera_fingerprint = ? LIMIT 1").bind(fingerprint).first<{ id: string; ownerUserId: string }>();
     if (duplicate) { await writeAudit(auth.db, auth.user.userId, "fraud.duplicate_rera", duplicate.id, { differentOwner: duplicate.ownerUserId !== auth.user.userId }); return secureJson({ error: "This RERA number is already registered and has been flagged for admin review." }, 409); }
   }
-  await auth.db.prepare("INSERT INTO registered_projects (id, owner_user_id, name, area, country, site_address, currency, rera_encrypted, rera_fingerprint, status, builder, value, homes, description, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").bind(id, auth.user.userId, project.name, project.area, project.country, project.siteAddress || null, project.currency, encrypted, fingerprint, project.status, project.builder, project.value, project.homes, project.description, now, now).run();
+  const location = await geocodeIndiaProject(project.siteAddress ? `${project.siteAddress}, ${project.area}` : project.area);
+  await auth.db.prepare("INSERT INTO registered_projects (id, owner_user_id, name, area, country, site_address, currency, rera_encrypted, rera_fingerprint, status, builder, value, homes, description, latitude, longitude, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").bind(id, auth.user.userId, project.name, project.area, project.country, project.siteAddress || null, project.currency, encrypted, fingerprint, project.status, project.builder, project.value, project.homes, project.description, location?.latitude ?? null, location?.longitude ?? null, now, now).run();
   await writeAudit(auth.db, auth.user.userId, "project.registered", id, { country: project.country, status: project.status });
-  return secureJson({ project: { id, ...project, siteAddress: project.siteAddress || undefined, reraNumber: project.reraNumber || undefined, completion: "Not scheduled", confidence: 100, updated: "Just registered", description: project.description, tags: ["Verified account submission"], coordinates: { x: 50, y: 50 } } }, 201);
+  return secureJson({ project: { id, ...project, siteAddress: project.siteAddress || undefined, reraNumber: project.reraNumber || undefined, completion: "Not scheduled", confidence: 100, updated: "Just registered", description: project.description, tags: ["Verified account submission"], coordinates: location || {} } }, 201);
 }
