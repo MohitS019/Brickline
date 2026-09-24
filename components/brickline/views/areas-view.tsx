@@ -6,9 +6,9 @@ import type { Project, ProjectStatus } from "@/lib/brickline-data";
 import { googleMapEmbed } from "@/lib/project-map";
 
 const stages: { label: string; status: ProjectStatus; tone: string }[] = [
-  { label: "New projects", status: "New construction", tone: "coral" },
+  { label: "New projects", status: "New construction", tone: "neutral" },
   { label: "Construction started", status: "Construction started", tone: "green" },
-  { label: "Redevelopment", status: "Redevelopment", tone: "purple" },
+  { label: "Redevelopment", status: "Redevelopment", tone: "neutral" },
   { label: "Awaiting approval", status: "Approval stage", tone: "amber" },
 ];
 

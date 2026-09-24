@@ -36,6 +36,6 @@ export const opportunities: Opportunity[] = [];
 export const signals: RadarSignal[] = [];
 
 export const statusColor: Record<ProjectStatus, string> = {
-  "New construction": "#3f65d9", "Redevelopment": "#df8c34",
-  "Approval stage": "#9b62d6", "Construction started": "#2f8f78",
+  "New construction": "#6f746f", "Redevelopment": "#6f746f",
+  "Approval stage": "#c8832f", "Construction started": "#3d6753",
 };
