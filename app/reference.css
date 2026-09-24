@@ -3280,6 +3280,26 @@ textarea:focus-visible {
   background: #faebe7;
   border-color: #e4b5aa;
 }
+.verification-badge.demo {
+  color: #35546f;
+  background: #edf4fa;
+  border-color: #b9cfdf;
+}
+.admin-summary small {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+.admin-demo-note {
+  margin: 0;
+  padding: 8px 15px;
+  border-bottom: 1px solid var(--line);
+  background: #f5f8fb;
+  color: #35546f;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
 .verification-check {
   margin-left: -2px;
 }

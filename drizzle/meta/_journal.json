@@ -64,6 +64,13 @@
       "when": 1790248320436,
       "tag": "0008_tearful_whistler",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1790251136566,
+      "tag": "0009_outstanding_warlock",
+      "breakpoints": true
     }
   ]
 }

@@ -156,7 +156,10 @@ export function MapView({
             </strong>{" "}
             started
           </div>
-          <small>Only registered Brickline records are counted.</small>
+          <small>
+            Demo records are labeled; every count uses this shared workspace
+            dataset.
+          </small>
         </aside>
       </section>
       <section className="map-explorer">

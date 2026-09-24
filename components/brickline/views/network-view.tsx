@@ -84,7 +84,13 @@ export function NetworkView({
                   : "BUILDER PROFILE · WORKSPACE DATA"}
               </span>
               <h2>{selected}</h2>
-              <VerificationBadge state="rera-verified" />
+              <VerificationBadge
+                state={
+                  active.every((project) => project.isDemo)
+                    ? "demo"
+                    : "rera-verified"
+                }
+              />
               <p>
                 {role === "Client"
                   ? `${active.length} mapped projects`
@@ -198,7 +204,11 @@ export function NetworkView({
                   name={name}
                   projectCount={projects.length}
                   primaryLocality={projects[0]?.area || "India"}
-                  verification="rera-verified"
+                  verification={
+                    projects.every((project) => project.isDemo)
+                      ? "demo"
+                      : "rera-verified"
+                  }
                   trailing={
                     role === "Client" ? <LockKeyhole size={15} /> : undefined
                   }
@@ -210,9 +220,7 @@ export function NetworkView({
             <div className="builder-directory-empty">
               <Building2 size={35} />
               <h3>No builders to show yet</h3>
-              <p>
-                No builder records are available. No sample companies are shown.
-              </p>
+              <p>No builder records are available for the current search.</p>
               {role === "Builder" && (
                 <button className="reference-primary" onClick={onAdd}>
                   <Plus size={15} />

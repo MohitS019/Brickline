@@ -47,6 +47,7 @@ export const builderAccessRequests = sqliteTable("builder_access_requests", {
   gstFingerprint: text("gst_fingerprint"),
   rejectionReason: text("rejection_reason"),
   verifiedAt: integer("verified_at"),
+  isDemo: integer("is_demo", { mode: "boolean" }).notNull().default(false),
 });
 
 export const panelContent = sqliteTable("panel_content", {
@@ -119,10 +120,12 @@ export const registeredProjects = sqliteTable(
     value: integer("value").notNull(),
     homes: integer("homes").notNull(),
     description: text("description").notNull(),
+    completion: text("completion").notNull().default("Not scheduled"),
     published: integer("published", { mode: "boolean" })
       .notNull()
       .default(true),
     viewCount: integer("view_count").notNull().default(0),
+    isDemo: integer("is_demo", { mode: "boolean" }).notNull().default(false),
     createdAt: integer("created_at").notNull(),
     updatedAt: integer("updated_at").notNull(),
   },
@@ -176,6 +179,7 @@ export const areaSignals = sqliteTable(
     eventDate: text("event_date").notNull(),
     createdAt: integer("created_at").notNull(),
     createdBy: text("created_by").notNull(),
+    isDemo: integer("is_demo", { mode: "boolean" }).notNull().default(false),
   },
   (table) => [
     index("idx_signals_created").on(table.createdAt),

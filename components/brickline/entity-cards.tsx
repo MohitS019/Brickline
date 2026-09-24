@@ -7,18 +7,21 @@ import {
   Building2,
   Check,
   Clock3,
+  Database,
   MapPin,
   ShieldAlert,
   ShieldCheck,
 } from "lucide-react";
 import { statusColor, type Project } from "@/lib/brickline-data";
 
-export type VerificationState = "rera-verified" | "pending" | "unverified";
+export type VerificationState =
+  "rera-verified" | "pending" | "unverified" | "demo";
 
 const verificationCopy: Record<VerificationState, string> = {
   "rera-verified": "RERA Verified",
   pending: "Pending Verification",
   unverified: "Unverified",
+  demo: "Demo record",
 };
 
 export function VerificationBadge({
@@ -33,7 +36,9 @@ export function VerificationBadge({
       ? ShieldCheck
       : state === "pending"
         ? Clock3
-        : ShieldAlert;
+        : state === "demo"
+          ? Database
+          : ShieldAlert;
   return (
     <span className={`verification-badge ${state} ${className}`.trim()}>
       <Icon size={13} />
@@ -87,7 +92,9 @@ export function ProjectCard({
             >
               {project.status}
             </span>
-            <VerificationBadge state="rera-verified" />
+            <VerificationBadge
+              state={project.isDemo ? "demo" : "rera-verified"}
+            />
           </span>
         </span>
         <ArrowRight size={15} className="entity-card-arrow" />
@@ -124,7 +131,9 @@ export function ProjectCard({
           >
             {project.status}
           </span>
-          <VerificationBadge state="rera-verified" />
+          <VerificationBadge
+            state={project.isDemo ? "demo" : "rera-verified"}
+          />
         </div>
         <h2>{project.name}</h2>
         <p>

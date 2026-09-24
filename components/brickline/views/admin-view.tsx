@@ -34,6 +34,7 @@ type Account = {
   gstNumber?: string | null;
   rejectionReason?: string | null;
   verifiedAt?: number | null;
+  isDemo?: boolean;
 };
 type Action = "approve" | "decline" | "suspend" | "restore" | "set-panels";
 const panels: {
@@ -221,6 +222,9 @@ export function AdminView({
                 {accounts.filter((item) => item.status === "approved").length}
               </b>
               Approved
+              <small>
+                {accounts.filter((item) => item.isDemo).length} demo builders
+              </small>
             </span>
             <span className="suspended">
               <b>
@@ -315,12 +319,14 @@ export function AdminView({
                         ).length
                       }
                       verification={
-                        account.status === "approved" &&
-                        Boolean(account.reraNumber)
-                          ? "rera-verified"
-                          : account.status === "pending"
-                            ? "pending"
-                            : "unverified"
+                        account.isDemo
+                          ? "demo"
+                          : account.status === "approved" &&
+                              Boolean(account.reraNumber)
+                            ? "rera-verified"
+                            : account.status === "pending"
+                              ? "pending"
+                              : "unverified"
                       }
                       trailing={
                         <em
@@ -335,6 +341,11 @@ export function AdminView({
                         </em>
                       }
                     />
+                    {account.isDemo && (
+                      <p className="admin-demo-note">
+                        Illustrative profile from the shared demo dataset.
+                      </p>
+                    )}
                     <div className="admin-verification-details">
                       <span>
                         <b>Phone</b>

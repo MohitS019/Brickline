@@ -14,6 +14,7 @@ import {
 } from "@/lib/sensitive-data";
 import { geocodeIndiaProject } from "@/lib/geocoding";
 import type { ProjectStatus } from "@/lib/brickline-data";
+import { ensureDemoData } from "@/lib/demo-seed";
 
 export const dynamic = "force-dynamic";
 const statuses: ProjectStatus[] = [
@@ -36,10 +37,12 @@ type ProjectRow = {
   value: number;
   homes: number;
   description: string;
+  completion: string;
   latitude: number | null;
   longitude: number | null;
   published: number;
   viewCount: number;
+  isDemo: number;
   updatedAt: number;
 };
 
@@ -72,9 +75,10 @@ export async function GET() {
     if (!access.consentVersion || access.consentWithdrawnAt)
       return secureJson({ error: "Privacy consent is required." }, 403);
   }
+  await ensureDemoData(db);
   const rows = await db
     .prepare(
-      "SELECT id, owner_user_id AS ownerUserId, name, area, country, site_address AS siteAddress, currency, rera_encrypted AS reraEncrypted, status, builder, value, homes, description, latitude, longitude, published, view_count AS viewCount, updated_at AS updatedAt FROM registered_projects ORDER BY updated_at DESC LIMIT 500",
+      "SELECT id, owner_user_id AS ownerUserId, name, area, country, site_address AS siteAddress, currency, rera_encrypted AS reraEncrypted, status, builder, value, homes, description, completion, latitude, longitude, published, view_count AS viewCount, is_demo AS isDemo, updated_at AS updatedAt FROM registered_projects ORDER BY updated_at DESC LIMIT 500",
     )
     .all<ProjectRow>();
   const projects = await Promise.all(
@@ -98,11 +102,15 @@ export async function GET() {
         builder: row.builder,
         value: row.value,
         homes: row.homes,
-        completion: "Not scheduled",
+        completion: row.completion,
         confidence: 100,
-        updated: "Registered",
+        updated: row.isDemo ? "Demo dataset" : "Registered",
         description: row.description,
-        tags: ["Verified account submission"],
+        tags: [
+          row.isDemo
+            ? "Illustrative demo record"
+            : "Verified account submission",
+        ],
         coordinates: {
           latitude: row.latitude ?? undefined,
           longitude: row.longitude ?? undefined,
@@ -110,6 +118,7 @@ export async function GET() {
         published: Boolean(row.published),
         viewCount: row.viewCount,
         ownedByMe: row.ownerUserId === user.userId,
+        isDemo: Boolean(row.isDemo),
       })),
   );
   return secureJson({ projects });

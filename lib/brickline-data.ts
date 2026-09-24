@@ -38,6 +38,7 @@ export interface Project {
   published?: boolean;
   viewCount?: number;
   ownedByMe?: boolean;
+  isDemo?: boolean;
 }
 
 export interface NetworkMember {
@@ -86,9 +87,10 @@ export interface AreaSignal {
   sourceNote: string;
   eventDate: string;
   createdAt: number;
+  isDemo?: boolean;
 }
 
-// The global workspace starts without fabricated project, person, or signal records.
+// Live project, builder, and signal records are loaded from the shared workspace API.
 export const projects: Project[] = [];
 export const network: NetworkMember[] = [];
 export const opportunities: Opportunity[] = [];
