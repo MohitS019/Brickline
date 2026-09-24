@@ -61,3 +61,15 @@ html{scroll-behavior:smooth}body{background:var(--canvas);color:var(--ink);font-
 .research-action-bar{position:sticky;bottom:0;z-index:6;display:grid;grid-template-columns:1fr auto auto;background:var(--ink);padding:13px 18px;gap:8px;box-shadow:0 -8px 24px #221b1420}.research-action-bar button{border:1px solid #ffffff38;background:transparent;color:#fff;min-height:42px;padding:0 15px;display:flex;align-items:center;justify-content:center;gap:7px;font-size:.78rem;font-weight:850}.research-action-bar .contact{background:var(--coral);border-color:var(--coral)}.research-action-bar .saved{color:#b9d7bd;border-color:#77a580}
 @media(max-width:760px){.research-steps{display:flex;overflow-x:auto;justify-content:flex-start}.research-steps button{min-width:130px}.research-facts,.developer-metrics,.area-research-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.research-stage{min-height:390px}}
 @media(max-width:520px){.research-header{padding:16px!important}.research-header h2{font-size:1.3rem!important}.research-section{padding:21px 18px}.research-hero{height:175px;padding:18px}.research-hero strong{font-size:1.1rem}.research-facts{padding:16px 18px;grid-template-columns:1fr 1fr}.research-next{padding:14px 18px}.research-action-bar{grid-template-columns:1fr 1fr;padding:10px}.research-action-bar .contact{grid-column:1/-1}.research-action-bar button{min-height:40px}.research-timeline>div{grid-template-columns:26px 1fr}.research-timeline em{grid-column:2;justify-self:start;margin-top:-4px}.developer-metrics,.area-research-grid{grid-template-columns:1fr 1fr}}
+.brand-lockup{display:inline-flex;align-items:center;gap:9px;color:var(--ink)}
+.brand-symbol{width:34px;height:34px;flex:0 0 34px;background:url("/brickline-logo-mark.svg") center/contain no-repeat}
+.brand-type{display:grid;line-height:1;text-align:left}
+.brand-type>span{font-size:1.35rem;font-weight:900;letter-spacing:-.065em;color:var(--ink)}
+.brand-type b,.brand-type i{color:var(--coral);font-style:normal}
+.brand-type small{margin-top:5px;color:#7f756a;font:700 .5rem/1 ui-monospace,SFMono-Regular,Consolas,monospace;letter-spacing:1.4px;text-transform:uppercase}
+.site-brand{display:inline-flex;align-items:center}
+.site-brand .brand-type>span{font-size:1.24rem}
+.site-brand .brand-symbol{width:32px;height:32px;flex-basis:32px}
+.approval-brand .brand-symbol{width:42px;height:42px;flex-basis:42px}
+.approval-brand .brand-type>span{font-size:1.55rem}
+.privacy-page .site-brand{text-decoration:none}

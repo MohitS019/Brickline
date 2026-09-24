@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import { Bell, Menu, Search, UserRound, X } from "lucide-react";
 import type { Role, ViewId } from "@/lib/brickline-data";
+import { BrandLogo } from "./brand-logo";
 
 const primary: { id: ViewId; label: string }[] = [
   { id: "client-access", label: "My panel" },
@@ -38,7 +39,7 @@ export function AppShell({ children, view, role, allowedRoles, isAdmin, mobileOp
   const primaryItems = isAdmin ? [{ id: "admin" as ViewId, label: "Admin" }, ...primary] : primary;
   return <main className="app-shell reference-shell">
     <header className="site-header">
-      <button className="site-brand" onClick={() => go("map")} aria-label="Brickline home">Brick<span>line</span><i>.</i></button>
+      <button className="site-brand" onClick={() => go("map")} aria-label="Brickline home"><BrandLogo /></button>
       <nav className="site-nav" aria-label="Main navigation">{primaryItems.map(item => <button key={item.id} className={view === item.id ? "active" : ""} onClick={() => go(item.id)}>{item.label}</button>)}</nav>
       <div className="site-actions">
         <button className="site-search" onClick={onSearch} aria-label="Search Brickline"><Search size={18}/><span>Search</span></button>

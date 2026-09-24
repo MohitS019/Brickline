@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Clock3, LockKeyhole, RefreshCw, ShieldCheck } from "lucide-react";
 import type { PanelAccess } from "@/lib/panel-access";
 import type { Role } from "@/lib/brickline-data";
+import { BrandLogo } from "./brand-logo";
 
 export function PanelAccessGate({ access }: { access: PanelAccess }) {
   const [role, setRole] = useState<Role>(access.requestedRole || "Builder");
@@ -41,7 +42,7 @@ export function PanelAccessGate({ access }: { access: PanelAccess }) {
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not save consent."); setBusy(false); }
   };
 
-  return <main className="approval-shell"><div className="approval-brand">Brick<span>line.</span></div><section className="approval-card"><div className="approval-icon"><LockKeyhole size={26}/></div><span className="micro-label">PANEL ACCESS</span>
+  return <main className="approval-shell"><div className="approval-brand"><BrandLogo descriptor /></div><section className="approval-card"><div className="approval-icon"><LockKeyhole size={26}/></div><span className="micro-label">PANEL ACCESS</span>
     {access.mode === "signed-out" ? <><h1>Sign in to continue.</h1><p>Each panel is linked to a signed-in account so the admin can manage access.</p><a className="reference-primary" href="/signin-with-chatgpt?return_to=%2F" target="_top">Sign in with ChatGPT</a></> :
     access.mode === "unavailable" ? <><h1>Access check unavailable.</h1><p>We cannot confirm your permissions right now. Please try again shortly.</p><button className="reference-primary" onClick={() => location.reload()}><RefreshCw size={15}/>Retry</button></> :
     access.needsConsent ? <><h1>Review privacy choices.</h1><p>Before using protected panels, accept the current privacy notice for account verification, projects, secure introductions, fraud prevention, and audit records.</p><div className="approval-status"><ShieldCheck size={18}/> No marketing consent included</div><label className="consent-choice"><input type="checkbox" checked={consent} onChange={event => setConsent(event.target.checked)}/><span>I have read the <a href="/privacy">Privacy Notice</a> and consent to the stated product-data processing.</span></label>{error && <p className="access-error" role="alert">{error}</p>}<button className="reference-primary" disabled={!consent || busy} onClick={acceptConsent}>{busy ? "Saving…" : "Accept and enter"}</button></> :

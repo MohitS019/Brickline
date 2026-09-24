@@ -17,6 +17,7 @@ import { ProfileView } from "./views/profile-view";
 import { ClientAccessView } from "./views/client-access-view";
 import { PanelAccessGate } from "./panel-access-gate";
 import { AdminView } from "./views/admin-view";
+import { BrandLogo } from "./brand-logo";
 import type { PanelAccess } from "@/lib/panel-access";
 import type { PanelContent } from "@/lib/panel-content";
 import type { AreaSignal, Opportunity, Project, Role, ViewId } from "@/lib/brickline-data";
@@ -104,7 +105,7 @@ export default function WorkspaceApp({ panelAccess, panelContent: initialPanelCo
     } else notify(`Message prepared for ${result.name}`);
   };
 
-  if (!hydrated) return <div className="approval-shell"><div className="approval-brand">Brick<span>line.</span></div></div>;
+  if (!hydrated) return <div className="approval-shell"><div className="approval-brand"><BrandLogo descriptor /></div></div>;
   if (!panelAccess.isAdmin && (panelAccess.needsConsent || panelAccess.status !== "approved" || !panelAccess.allowedRoles.length)) return <PanelAccessGate access={panelAccess}/>;
 
   let content: React.ReactNode;
