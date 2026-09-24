@@ -648,6 +648,11 @@ function SecurityAuditView() {
   >([]);
   const [cleanup, setCleanup] = useState("");
   const [error, setError] = useState("");
+  const introductionEvents = events.filter((event) =>
+    ["grant.created", "grant.expired", "grant.revoked"].includes(
+      event.eventType,
+    ),
+  );
   useEffect(() => {
     Promise.all([
       fetch("/api/security-audit", { cache: "no-store" }),
@@ -739,6 +744,32 @@ function SecurityAuditView() {
             .join(", ")}
         </div>
       )}
+      <div className="introduction-audit">
+        <div>
+          <span className="micro-label">INTRODUCTION LIFECYCLE</span>
+          <h3>Issued, expired and revoked access</h3>
+        </div>
+        {introductionEvents.length ? (
+          <div>
+            {introductionEvents.map((event) => {
+              const eventState = event.eventType.split(".")[1];
+              const state = eventState === "created" ? "issued" : eventState;
+              return (
+                <p key={`introduction-${event.id}`}>
+                  <span className={`share-state ${state}`}>{state}</span>
+                  <span>
+                    <b>{event.actor}</b>
+                    <small>{event.targetId || "No grant ID"}</small>
+                  </span>
+                  <time>{new Date(event.createdAt).toLocaleString()}</time>
+                </p>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="admin-empty">No introduction activity yet.</p>
+        )}
+      </div>
       <div className="admin-privacy-queue">
         <span className="micro-label">PRIVACY REQUEST QUEUE</span>
         {privacyRequests.filter((item) => item.status === "pending").length ? (

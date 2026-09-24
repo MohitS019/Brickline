@@ -3871,10 +3871,9 @@ textarea:focus-visible {
 .builder-project-table-head,
 .builder-project-table-row {
   display: grid;
-  grid-template-columns: minmax(210px, 1.7fr) minmax(145px, 1fr) minmax(
-      105px,
-      0.75fr
-    ) 75px minmax(190px, 1fr);
+  grid-template-columns:
+    minmax(210px, 1.7fr) minmax(145px, 1fr) minmax(105px, 0.75fr)
+    75px minmax(190px, 1fr);
   align-items: center;
   gap: 10px;
   padding: 12px 14px;
@@ -4036,6 +4035,84 @@ textarea:focus-visible {
   background: #fae8e4;
   color: var(--red);
 }
+.share-state.issued {
+  background: #e8eef5;
+  color: var(--blue);
+}
+.secure-access-live {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 0;
+  padding: 12px 14px;
+  border: 1px solid #b9d4c0;
+  border-left: 4px solid var(--green);
+  background: #f2faf4;
+  color: var(--green);
+}
+.secure-access-live span {
+  display: grid;
+  gap: 2px;
+  color: var(--ink);
+  font-size: 0.8rem;
+}
+.secure-access-denial {
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+  margin: 12px 0;
+  padding: 22px;
+  border: 1px solid #efb9ae;
+  border-left: 5px solid var(--red);
+  background: #fff8f6;
+}
+.secure-access-denial > svg {
+  color: var(--red);
+}
+.secure-access-denial h2,
+.introduction-audit h3 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+.secure-access-denial p {
+  margin: 0 0 6px;
+  color: var(--muted);
+  line-height: 1.55;
+}
+.introduction-audit {
+  margin: 14px 0;
+  border: 1px solid var(--line);
+  background: #fff;
+  padding: 16px;
+}
+.introduction-audit > div:first-child {
+  display: grid;
+  gap: 5px;
+  margin-bottom: 12px;
+}
+.introduction-audit > div:last-child {
+  display: grid;
+  gap: 7px;
+}
+.introduction-audit p {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+.introduction-audit p > span:nth-child(2) {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.introduction-audit small,
+.introduction-audit time {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
 .discover-panel {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -4086,5 +4163,11 @@ textarea:focus-visible {
   }
   .role-panel-tabs {
     overflow-x: auto;
+  }
+  .introduction-audit p {
+    grid-template-columns: auto 1fr;
+  }
+  .introduction-audit time {
+    grid-column: 2;
   }
 }

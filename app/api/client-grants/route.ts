@@ -8,6 +8,7 @@ import {
   writeAudit,
 } from "@/lib/api-security";
 import { createGrantToken, verifyGrantToken } from "@/lib/grant-token";
+import { recordExpiredGrantAudits } from "@/lib/grant-expiry";
 import { fingerprintSensitive } from "@/lib/sensitive-data";
 
 export const dynamic = "force-dynamic";
@@ -15,11 +16,48 @@ const allowedMinutes = [15, 30, 60, 120];
 const deviceLabel = (userAgent: string) =>
   `${/Mobile|Android|iPhone/i.test(userAgent) ? "Mobile" : "Desktop"} · ${/Edg\//.test(userAgent) ? "Edge" : /Chrome\//.test(userAgent) ? "Chrome" : /Safari\//.test(userAgent) ? "Safari" : /Firefox\//.test(userAgent) ? "Firefox" : "Browser"}`;
 
+type ClientGrantRow = {
+  id: string;
+  agentUserId: string;
+  builderProfileId: string;
+  projectId: string | null;
+  projectName: string;
+  expiresAt: number;
+  createdAt: number;
+  firstOpenedAt: number | null;
+  revokedAt: number | null;
+  openCount: number;
+  agentName: string;
+};
+
+async function clientGrantPayload(
+  rows: ClientGrantRow[],
+  clientUserId: string,
+) {
+  return Promise.all(
+    rows.map(async ({ agentUserId, ...grant }) => ({
+      ...grant,
+      token:
+        !grant.revokedAt && grant.expiresAt > Date.now() && grant.projectId
+          ? await createGrantToken({
+              jti: grant.id,
+              sub: clientUserId,
+              aid: agentUserId,
+              bid: grant.builderProfileId,
+              pid: grant.projectId,
+              exp: Math.floor(grant.expiresAt / 1000),
+            })
+          : undefined,
+    })),
+  );
+}
+
 export async function GET(request: Request) {
   const user = await getChatGPTUser();
   if (!user) return secureJson({ error: "Sign in is required." }, 401);
   const db = getPanelDb();
   if (!db) return secureJson({ error: "Access grants are unavailable." }, 503);
+  await recordExpiredGrantAudits(db);
   const admin = isBricklineAdmin(user);
   const access: {
     status: string;
@@ -49,11 +87,14 @@ export async function GET(request: Request) {
   if (requestedMode === "client" && access?.client) {
     const rows = await db
       .prepare(
-        "SELECT g.id, g.builder_profile_id AS builderProfileId, g.project_id AS projectId, COALESCE(p.name, 'Builder profile access') AS projectName, g.expires_at AS expiresAt, g.created_at AS createdAt, g.first_opened_at AS firstOpenedAt, g.revoked_at AS revokedAt, g.open_count AS openCount, COALESCE(a.name, 'Brickline agent') AS agentName FROM client_access_grants g LEFT JOIN builder_access_requests a ON a.user_id = g.agent_user_id LEFT JOIN registered_projects p ON p.id = g.project_id WHERE g.client_user_id = ? ORDER BY g.created_at DESC LIMIT 100",
+        "SELECT g.id, g.agent_user_id AS agentUserId, g.builder_profile_id AS builderProfileId, g.project_id AS projectId, COALESCE(p.name, 'Builder profile access') AS projectName, g.expires_at AS expiresAt, g.created_at AS createdAt, g.first_opened_at AS firstOpenedAt, g.revoked_at AS revokedAt, g.open_count AS openCount, COALESCE(a.name, 'Brickline agent') AS agentName FROM client_access_grants g LEFT JOIN builder_access_requests a ON a.user_id = g.agent_user_id LEFT JOIN registered_projects p ON p.id = g.project_id WHERE g.client_user_id = ? ORDER BY g.created_at DESC LIMIT 100",
       )
       .bind(user.userId)
-      .all();
-    return secureJson({ mode: "client", grants: rows.results });
+      .all<ClientGrantRow>();
+    return secureJson({
+      mode: "client",
+      grants: await clientGrantPayload(rows.results, user.userId),
+    });
   }
   if (access?.agent) {
     const rows = await db
@@ -67,11 +108,14 @@ export async function GET(request: Request) {
   if (access?.client) {
     const rows = await db
       .prepare(
-        "SELECT g.id, g.builder_profile_id AS builderProfileId, g.project_id AS projectId, COALESCE(p.name, 'Builder profile access') AS projectName, g.expires_at AS expiresAt, g.created_at AS createdAt, g.first_opened_at AS firstOpenedAt, g.revoked_at AS revokedAt, g.open_count AS openCount, COALESCE(a.name, 'Brickline agent') AS agentName FROM client_access_grants g LEFT JOIN builder_access_requests a ON a.user_id = g.agent_user_id LEFT JOIN registered_projects p ON p.id = g.project_id WHERE g.client_user_id = ? ORDER BY g.created_at DESC LIMIT 100",
+        "SELECT g.id, g.agent_user_id AS agentUserId, g.builder_profile_id AS builderProfileId, g.project_id AS projectId, COALESCE(p.name, 'Builder profile access') AS projectName, g.expires_at AS expiresAt, g.created_at AS createdAt, g.first_opened_at AS firstOpenedAt, g.revoked_at AS revokedAt, g.open_count AS openCount, COALESCE(a.name, 'Brickline agent') AS agentName FROM client_access_grants g LEFT JOIN builder_access_requests a ON a.user_id = g.agent_user_id LEFT JOIN registered_projects p ON p.id = g.project_id WHERE g.client_user_id = ? ORDER BY g.created_at DESC LIMIT 100",
       )
       .bind(user.userId)
-      .all();
-    return secureJson({ mode: "client", grants: rows.results });
+      .all<ClientGrantRow>();
+    return secureJson({
+      mode: "client",
+      grants: await clientGrantPayload(rows.results, user.userId),
+    });
   }
   return secureJson({ error: "Agent or Client access required." }, 403);
 }
@@ -172,6 +216,7 @@ export async function POST(request: Request) {
     sub: client.userId,
     aid: auth.user.userId,
     bid: builderProfileId,
+    pid: projectId,
     exp: Math.floor(expiresAt / 1000),
   });
   return secureJson(
@@ -198,30 +243,48 @@ export async function PATCH(request: Request) {
   if (!user) return secureJson({ error: "Sign in is required." }, 401);
   const db = getPanelDb();
   if (!db) return secureJson({ error: "Access grants are unavailable." }, 503);
+  await recordExpiredGrantAudits(db);
   const body = (await request.json().catch(() => null)) as {
     action?: unknown;
     token?: unknown;
     grantId?: unknown;
   } | null;
-  if (body?.action === "open" && typeof body.token === "string") {
+  if (
+    (body?.action === "open" || body?.action === "validate") &&
+    typeof body.token === "string"
+  ) {
     const claims = await verifyGrantToken(body.token);
-    if (
-      !claims ||
-      claims.sub !== user.userId ||
-      claims.exp * 1000 <= Date.now()
-    )
+    if (!claims)
       return secureJson(
-        { error: "This secure link is invalid or expired." },
+        {
+          error: "This secure link is invalid.",
+          code: "invalid",
+        },
+        403,
+      );
+    if (claims.sub !== user.userId)
+      return secureJson(
+        {
+          error: "This introduction belongs to a different client account.",
+          code: "account",
+        },
+        403,
+      );
+    if (claims.exp * 1000 <= Date.now())
+      return secureJson(
+        { error: "This introduction has expired.", code: "expired" },
         403,
       );
     const grant = await db
       .prepare(
-        "SELECT g.id, g.builder_profile_id AS builderProfileId, g.expires_at AS expiresAt, g.revoked_at AS revokedAt, g.open_count AS openCount, g.bound_device_hash AS boundDeviceHash, g.last_country AS lastCountry, COALESCE(a.name, 'Brickline agent') AS agentName FROM client_access_grants g LEFT JOIN builder_access_requests a ON a.user_id = g.agent_user_id WHERE g.id = ? AND g.client_user_id = ? AND g.agent_user_id = ?",
+        "SELECT g.id, g.builder_profile_id AS builderProfileId, g.project_id AS projectId, COALESCE(p.name, 'Builder profile access') AS projectName, g.expires_at AS expiresAt, g.revoked_at AS revokedAt, g.open_count AS openCount, g.bound_device_hash AS boundDeviceHash, g.last_country AS lastCountry, COALESCE(a.name, 'Brickline agent') AS agentName FROM client_access_grants g LEFT JOIN builder_access_requests a ON a.user_id = g.agent_user_id LEFT JOIN registered_projects p ON p.id = g.project_id WHERE g.id = ? AND g.client_user_id = ? AND g.agent_user_id = ?",
       )
       .bind(claims.jti, user.userId, claims.aid)
       .first<{
         id: string;
         builderProfileId: string;
+        projectId: string | null;
+        projectName: string;
         expiresAt: number;
         revokedAt: number | null;
         openCount: number;
@@ -229,17 +292,33 @@ export async function PATCH(request: Request) {
         lastCountry: string | null;
         agentName: string;
       }>();
-    if (
-      !grant ||
-      grant.revokedAt ||
-      grant.expiresAt <= Date.now() ||
-      grant.builderProfileId !== claims.bid
-    )
+    if (!grant)
       return secureJson(
-        { error: "This access grant is no longer active." },
+        { error: "This secure link is invalid.", code: "invalid" },
         403,
       );
-    if (grant.openCount >= 5) {
+    if (grant.revokedAt)
+      return secureJson(
+        {
+          error: "This introduction was revoked by the agent.",
+          code: "revoked",
+        },
+        403,
+      );
+    if (grant.expiresAt <= Date.now())
+      return secureJson(
+        { error: "This introduction has expired.", code: "expired" },
+        403,
+      );
+    if (grant.builderProfileId !== claims.bid || grant.projectId !== claims.pid)
+      return secureJson(
+        {
+          error: "This secure link does not match the shared project.",
+          code: "invalid",
+        },
+        403,
+      );
+    if (body.action === "open" && grant.openCount >= 5) {
       await writeAudit(db, user.userId, "fraud.grant_open_limit", grant.id);
       return secureJson(
         { error: "This secure link has reached its five-open limit." },
@@ -284,31 +363,36 @@ export async function PATCH(request: Request) {
         403,
       );
     }
-    const openedAt = Date.now();
-    await db
-      .prepare(
-        "UPDATE client_access_grants SET first_opened_at = COALESCE(first_opened_at, ?), last_opened_at = ?, open_count = open_count + 1, bound_device_hash = COALESCE(bound_device_hash, ?), last_country = COALESCE(?, last_country), device_label = COALESCE(device_label, ?) WHERE id = ? AND open_count < 5",
-      )
-      .bind(
-        openedAt,
-        openedAt,
-        deviceHash,
+    if (body.action === "open") {
+      const openedAt = Date.now();
+      await db
+        .prepare(
+          "UPDATE client_access_grants SET first_opened_at = COALESCE(first_opened_at, ?), last_opened_at = ?, open_count = open_count + 1, bound_device_hash = COALESCE(bound_device_hash, ?), last_country = COALESCE(?, last_country), device_label = COALESCE(device_label, ?) WHERE id = ? AND open_count < 5",
+        )
+        .bind(
+          openedAt,
+          openedAt,
+          deviceHash,
+          country,
+          deviceLabel(userAgent),
+          grant.id,
+        )
+        .run();
+      await writeAudit(db, user.userId, "grant.opened", grant.id, {
+        builderProfileId: grant.builderProfileId,
+        projectId: grant.projectId,
+        openNumber: grant.openCount + 1,
         country,
-        deviceLabel(userAgent),
-        grant.id,
-      )
-      .run();
-    await writeAudit(db, user.userId, "grant.opened", grant.id, {
-      builderProfileId: grant.builderProfileId,
-      openNumber: grant.openCount + 1,
-      country,
-    });
+      });
+    }
     return secureJson({
       grant: {
         id: grant.id,
         builderProfileId: grant.builderProfileId,
+        projectId: grant.projectId,
+        projectName: grant.projectName,
         expiresAt: grant.expiresAt,
-        openCount: grant.openCount + 1,
+        openCount: grant.openCount + (body.action === "open" ? 1 : 0),
         agentName: grant.agentName,
       },
     });
@@ -318,9 +402,9 @@ export async function PATCH(request: Request) {
     if ("response" in auth) return auth.response;
     const result = await auth.db
       .prepare(
-        "UPDATE client_access_grants SET revoked_at = ? WHERE id = ? AND agent_user_id = ? AND revoked_at IS NULL",
+        "UPDATE client_access_grants SET revoked_at = ? WHERE id = ? AND agent_user_id = ? AND revoked_at IS NULL AND expires_at > ?",
       )
-      .bind(Date.now(), body.grantId, auth.user.userId)
+      .bind(Date.now(), body.grantId, auth.user.userId, Date.now())
       .run();
     if (!result.meta.changes)
       return secureJson({ error: "Active grant not found." }, 404);

@@ -71,6 +71,7 @@ export const clientAccessGrants = sqliteTable(
     createdAt: integer("created_at").notNull(),
     firstOpenedAt: integer("first_opened_at"),
     revokedAt: integer("revoked_at"),
+    expiryLoggedAt: integer("expiry_logged_at"),
     openCount: integer("open_count").notNull().default(0),
     boundDeviceHash: text("bound_device_hash"),
     lastOpenedAt: integer("last_opened_at"),
