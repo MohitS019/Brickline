@@ -23,6 +23,7 @@ import {
   type Role,
 } from "@/lib/brickline-data";
 import { projectMapLocation } from "@/lib/project-map";
+import { ProjectStatusBadge } from "@/components/brickline/entity-cards";
 
 type ResearchStep = "overview" | "timeline" | "developer" | "projects" | "area";
 
@@ -226,10 +227,7 @@ export function ProjectDetail({
               >
                 <Building2 className="detail-project-icon" size={82} />
                 <div>
-                  <span className="status-pill">
-                    <i style={{ background: statusColor[project.status] }} />
-                    {project.status}
-                  </span>
+                  <ProjectStatusBadge status={project.status} />
                   <strong>
                     {project.currency || "INR"} {project.value.toLocaleString()}
                   </strong>

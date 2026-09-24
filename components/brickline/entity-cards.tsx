@@ -5,23 +5,24 @@ import {
   ArrowRight,
   Bookmark,
   Building2,
-  Check,
-  Clock3,
   Database,
   MapPin,
-  ShieldAlert,
+  Shield,
   ShieldCheck,
+  ShieldX,
 } from "lucide-react";
-import { statusColor, type Project } from "@/lib/brickline-data";
+import {
+  statusColor,
+  type Project,
+  type ProjectStatus,
+} from "@/lib/brickline-data";
 
-export type VerificationState =
-  "rera-verified" | "pending" | "unverified" | "demo";
+export type VerificationState = "rera-verified" | "pending" | "unverified";
 
 const verificationCopy: Record<VerificationState, string> = {
   "rera-verified": "RERA Verified",
   pending: "Pending Verification",
   unverified: "Unverified",
-  demo: "Demo record",
 };
 
 export function VerificationBadge({
@@ -35,17 +36,32 @@ export function VerificationBadge({
     state === "rera-verified"
       ? ShieldCheck
       : state === "pending"
-        ? Clock3
-        : state === "demo"
-          ? Database
-          : ShieldAlert;
+        ? Shield
+        : ShieldX;
   return (
     <span className={`verification-badge ${state} ${className}`.trim()}>
-      <Icon size={13} />
+      <Icon size={16} />
       <span>{verificationCopy[state]}</span>
-      {state === "rera-verified" && (
-        <Check size={10} className="verification-check" />
-      )}
+    </span>
+  );
+}
+
+export function DemoBadge() {
+  return (
+    <span className="demo-record-badge">
+      <Database size={14} />
+      Demo record
+    </span>
+  );
+}
+
+export function ProjectStatusBadge({ status }: { status: ProjectStatus }) {
+  return (
+    <span
+      className="project-status-badge"
+      style={{ "--status-color": statusColor[status] } as CSSProperties}
+    >
+      {status}
     </span>
   );
 }
@@ -56,6 +72,7 @@ export function ProjectCard({
   saved = false,
   onSave,
   onOpen,
+  onBuilder,
   cornerAction,
 }: {
   project: Project;
@@ -63,11 +80,42 @@ export function ProjectCard({
   saved?: boolean;
   onSave?: () => void;
   onOpen: () => void;
+  onBuilder?: () => void;
   cornerAction?: ReactNode;
 }) {
+  const verification: VerificationState = project.isDemo
+    ? "pending"
+    : "rera-verified";
+  const openFromKey = (event: KeyboardEvent<HTMLElement>) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      onOpen();
+    }
+  };
+  const builderLabel = onBuilder ? (
+    <button
+      type="button"
+      className="entity-project-builder"
+      onClick={(event) => {
+        event.stopPropagation();
+        onBuilder();
+      }}
+      onKeyDown={(event) => event.stopPropagation()}
+    >
+      {project.builder}
+    </button>
+  ) : (
+    <span className="entity-project-builder">{project.builder}</span>
+  );
   if (variant === "compact")
     return (
-      <button className="entity-project-card compact" onClick={onOpen}>
+      <article
+        className="entity-project-card compact"
+        role="button"
+        tabIndex={0}
+        onClick={onOpen}
+        onKeyDown={openFromKey}
+      >
         <span
           className="entity-project-thumb"
           style={
@@ -78,27 +126,19 @@ export function ProjectCard({
         </span>
         <span className="entity-project-copy">
           <span className="entity-card-title">{project.name}</span>
-          <span className="entity-card-meta">
-            {project.builder} · {project.area}
+          <span className="entity-project-location">
+            <MapPin size={12} />
+            {project.area}
           </span>
+          {builderLabel}
           <span className="entity-card-badges">
-            <span
-              className="project-status-badge"
-              style={
-                {
-                  "--status-color": statusColor[project.status],
-                } as CSSProperties
-              }
-            >
-              {project.status}
-            </span>
-            <VerificationBadge
-              state={project.isDemo ? "demo" : "rera-verified"}
-            />
+            <ProjectStatusBadge status={project.status} />
+            <VerificationBadge state={verification} />
+            {project.isDemo && <DemoBadge />}
           </span>
         </span>
         <ArrowRight size={15} className="entity-card-arrow" />
-      </button>
+      </article>
     );
 
   return (
@@ -123,25 +163,17 @@ export function ProjectCard({
       </div>
       <div className="entity-project-body">
         <div className="entity-card-badges">
-          <span
-            className="project-status-badge"
-            style={
-              { "--status-color": statusColor[project.status] } as CSSProperties
-            }
-          >
-            {project.status}
-          </span>
-          <VerificationBadge
-            state={project.isDemo ? "demo" : "rera-verified"}
-          />
+          <ProjectStatusBadge status={project.status} />
+          <VerificationBadge state={verification} />
+          {project.isDemo && <DemoBadge />}
         </div>
         <h2>{project.name}</h2>
         <p>
-          <b>{project.builder}</b>
           <span>
             <MapPin size={12} />
-            {project.area}, India
+            {project.area}
           </span>
+          {builderLabel}
         </p>
         {variant !== "popover" && (
           <div className="entity-project-facts">
@@ -222,8 +254,7 @@ export function BuilderCard({
         <VerificationBadge state={verification} />
       </span>
       <span className="entity-builder-count">
-        <b>{projectCount}</b>
-        <small>PROJECTS</small>
+        <b>{projectCount}</b> {projectCount === 1 ? "project" : "projects"}
       </span>
       {trailing ||
         (onOpen && <ArrowRight size={16} className="entity-card-arrow" />)}

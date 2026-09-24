@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import type { Project, Role } from "@/lib/brickline-data";
 import type { PanelContent, PanelCopy } from "@/lib/panel-content";
-import { BuilderCard } from "@/components/brickline/entity-cards";
+import { BuilderCard, DemoBadge } from "@/components/brickline/entity-cards";
 
 type Account = {
   userId: string;
@@ -320,7 +320,7 @@ export function AdminView({
                       }
                       verification={
                         account.isDemo
-                          ? "demo"
+                          ? "pending"
                           : account.status === "approved" &&
                               Boolean(account.reraNumber)
                             ? "rera-verified"
@@ -343,7 +343,8 @@ export function AdminView({
                     />
                     {account.isDemo && (
                       <p className="admin-demo-note">
-                        Illustrative profile from the shared demo dataset.
+                        <DemoBadge /> Illustrative profile from the shared demo
+                        dataset.
                       </p>
                     )}
                     <div className="admin-verification-details">
@@ -472,12 +473,21 @@ export function AdminView({
                 ))}
               </div>
             ) : (
-              <div className="admin-empty">
-                <ShieldCheck size={30} />
+              <div className="admin-empty component-empty-state">
+                <Search size={30} />
                 <b>No matching accounts</b>
                 <p className="empty-guidance">
                   Real registrations appear here after sign-in.
                 </p>
+                <button
+                  className="reference-primary"
+                  onClick={() => {
+                    setFilter("all");
+                    setQuery("");
+                  }}
+                >
+                  Clear account filters
+                </button>
               </div>
             )}
           </section>

@@ -1,6 +1,13 @@
 "use client";
 import { useMemo, useState } from "react";
-import { Grid2X2, List, Plus, Search, SlidersHorizontal } from "lucide-react";
+import {
+  Building2,
+  Grid2X2,
+  List,
+  Plus,
+  Search,
+  SlidersHorizontal,
+} from "lucide-react";
 import { type Project, type ProjectStatus } from "@/lib/brickline-data";
 import { ProjectCard } from "@/components/brickline/entity-cards";
 import { EmptyState, PageHeader } from "../ui";
@@ -11,12 +18,14 @@ export function ProjectsView({
   onProject,
   onSave,
   onAdd,
+  onBuilder,
 }: {
   items: Project[];
   saved: Set<string>;
   onProject: (id: string) => void;
   onSave: (id: string) => void;
   onAdd: () => void;
+  onBuilder: (name: string) => void;
 }) {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<"All" | ProjectStatus>("All");
@@ -120,13 +129,31 @@ export function ProjectsView({
               saved={saved.has(project.id)}
               onSave={() => onSave(project.id)}
               onOpen={() => onProject(project.id)}
+              onBuilder={() => onBuilder(project.builder)}
             />
           ))}
         </div>
       ) : (
         <EmptyState
-          title="No projects yet"
-          body="Add the first RERA-registered Indian project, or clear your filters."
+          icon={Building2}
+          title="No projects match your filters yet"
+          body="Adjust the current filters or add a RERA project to this workspace."
+          action={
+            <div className="empty-actions">
+              <button
+                className="button secondary"
+                onClick={() => {
+                  setQuery("");
+                  setStatus("All");
+                }}
+              >
+                Adjust filters
+              </button>
+              <button className="button primary" onClick={onAdd}>
+                Add RERA project
+              </button>
+            </div>
+          }
         />
       )}
     </div>

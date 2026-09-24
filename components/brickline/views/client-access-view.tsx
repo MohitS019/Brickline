@@ -23,7 +23,10 @@ import type {
 } from "@/lib/brickline-data";
 import type { PanelCopy } from "@/lib/panel-content";
 import { Modal } from "@/components/brickline/ui";
-import { VerificationBadge } from "@/components/brickline/entity-cards";
+import {
+  ProjectCard,
+  VerificationBadge,
+} from "@/components/brickline/entity-cards";
 
 type ShareMinutes = 15 | 30 | 60 | 120;
 type ShareGrant = {
@@ -456,10 +459,16 @@ export function ClientAccessView({
                 })}
               </div>
             ) : (
-              <div className="access-empty">
+              <div className="access-empty component-empty-state">
                 <Users size={28} />
                 <b>No introductions yet</b>
                 <p>Ask your agent to share a project to see it here.</p>
+                <button
+                  className="reference-primary"
+                  onClick={() => onNavigate("map")}
+                >
+                  Explore public projects
+                </button>
               </div>
             )}
           </section>
@@ -559,7 +568,6 @@ export function ClientAccessView({
               >
                 <div className="builder-project-table-head" role="row">
                   <span>Project</span>
-                  <span>Status</span>
                   <span>Publishing</span>
                   <span>Views</span>
                   <span>Actions</span>
@@ -570,16 +578,12 @@ export function ClientAccessView({
                     role="row"
                     key={project.id}
                   >
-                    <span>
-                      <b>{project.name}</b>
-                      <small>{project.area}</small>
-                    </span>
-                    <span>
-                      <i
-                        className={`project-stage-dot ${project.status.toLowerCase().replaceAll(" ", "-")}`}
-                      />
-                      {project.status}
-                    </span>
+                    <ProjectCard
+                      project={project}
+                      variant="compact"
+                      onOpen={() => onProject(project.id)}
+                      onBuilder={() => onNavigate("network")}
+                    />
                     <span>
                       {project.published ? (
                         <>
@@ -620,10 +624,16 @@ export function ClientAccessView({
                 ))}
               </div>
             ) : (
-              <div className="access-empty">
+              <div className="access-empty component-empty-state">
                 <Plus size={28} />
                 <b>No projects in your account</b>
                 <p>Add a RERA-registered project to begin.</p>
+                <button
+                  className="reference-primary"
+                  onClick={() => onNavigate("projects")}
+                >
+                  Add RERA project
+                </button>
               </div>
             )}
           </section>

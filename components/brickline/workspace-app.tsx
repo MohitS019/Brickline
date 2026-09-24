@@ -289,6 +289,7 @@ export default function WorkspaceApp({
             )
           }
           onAdd={requestProjectForm}
+          onBuilder={() => navigate("network")}
         />
       );
       break;

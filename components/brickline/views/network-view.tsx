@@ -6,6 +6,7 @@ import type { Project, Role } from "@/lib/brickline-data";
 import { googleMapEmbed } from "@/lib/project-map";
 import {
   BuilderCard,
+  DemoBadge,
   ProjectCard,
   VerificationBadge,
 } from "@/components/brickline/entity-cards";
@@ -87,10 +88,11 @@ export function NetworkView({
               <VerificationBadge
                 state={
                   active.every((project) => project.isDemo)
-                    ? "demo"
+                    ? "pending"
                     : "rera-verified"
                 }
               />
+              {active.every((project) => project.isDemo) && <DemoBadge />}
               <p>
                 {role === "Client"
                   ? `${active.length} mapped projects`
@@ -206,7 +208,7 @@ export function NetworkView({
                   primaryLocality={projects[0]?.area || "India"}
                   verification={
                     projects.every((project) => project.isDemo)
-                      ? "demo"
+                      ? "pending"
                       : "rera-verified"
                   }
                   trailing={

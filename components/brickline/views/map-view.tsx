@@ -1,22 +1,22 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { type CSSProperties, FormEvent, useMemo, useState } from "react";
 import { ArrowRight, MapPin, Plus, Search, X } from "lucide-react";
 import { InteractiveProjectMap } from "@/components/brickline/interactive-project-map";
 import { ProjectCard } from "@/components/brickline/entity-cards";
 import {
+  statusColor,
   type Project,
   type ProjectStatus,
   type ViewId,
 } from "@/lib/brickline-data";
 
-const statusFilters: { label: string; status: ProjectStatus; tone: string }[] =
-  [
-    { label: "New", status: "New construction", tone: "neutral" },
-    { label: "Started", status: "Construction started", tone: "green" },
-    { label: "Redevelopment", status: "Redevelopment", tone: "neutral" },
-    { label: "Approval", status: "Approval stage", tone: "amber" },
-  ];
+const statusFilters: { label: string; status: ProjectStatus }[] = [
+  { label: "New", status: "New construction" },
+  { label: "Started", status: "Construction started" },
+  { label: "Redevelopment", status: "Redevelopment" },
+  { label: "Approval", status: "Approval stage" },
+];
 type Suggestion = {
   id: string;
   label: string;
@@ -223,18 +223,12 @@ export function MapView({
                   </h2>
                 </div>
                 <div className="map-legend">
-                  <span>
-                    <i className="neutral" />
-                    New / redevelopment
-                  </span>
-                  <span>
-                    <i className="active" />
-                    Started
-                  </span>
-                  <span>
-                    <i className="pending" />
-                    Approval
-                  </span>
+                  {statusFilters.map((entry) => (
+                    <span key={entry.status}>
+                      <i style={{ background: statusColor[entry.status] }} />
+                      {entry.label}
+                    </span>
+                  ))}
                 </div>
               </div>
               <div className="map-stage-visual">
@@ -252,6 +246,7 @@ export function MapView({
                     project={focusedProject}
                     variant="popover"
                     onOpen={() => onProject(focusedProject.id)}
+                    onBuilder={() => onNavigate("network")}
                     cornerAction={
                       <button
                         className="map-summary-close"
@@ -292,8 +287,13 @@ export function MapView({
                   key={entry.status}
                   className={
                     filter === entry.status
-                      ? `active ${entry.tone}`
-                      : entry.tone
+                      ? "active status-filter"
+                      : "status-filter"
+                  }
+                  style={
+                    {
+                      "--status-color": statusColor[entry.status],
+                    } as CSSProperties
                   }
                   onClick={() => {
                     setFilter(entry.status);
@@ -346,10 +346,12 @@ export function MapView({
                       project={project}
                       variant="compact"
                       onOpen={() => focusProject(project)}
+                      onBuilder={() => onNavigate("network")}
                     />
                   ))
               ) : (
-                <div className="map-rail-empty">
+                <div className="map-rail-empty component-empty-state">
+                  <MapPin size={24} />
                   <p>No registered project matches yet.</p>
                   <button onClick={items.length ? reset : onAdd}>
                     {items.length ? "Clear filters" : "Add the first project"}{" "}
