@@ -14,7 +14,6 @@ import {
   MessageSquare,
   Share2,
   Users,
-  X,
 } from "lucide-react";
 import {
   statusColor,
@@ -39,6 +38,7 @@ interface Props {
   onNotify: (message: string) => void;
   onProject: (id: string) => void;
   onOpenArea: () => void;
+  backLabel: string;
 }
 
 const steps: { id: ResearchStep; label: string }[] = [
@@ -61,16 +61,10 @@ export function ProjectDetail({
   onNotify,
   onProject,
   onOpenArea,
+  backLabel,
 }: Props) {
   const [step, setStep] = useState<ResearchStep>("overview");
   const project = items.find((item) => item.id === id);
-  useEffect(() => {
-    const handleKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", handleKey);
-    return () => window.removeEventListener("keydown", handleKey);
-  }, [onClose]);
   useEffect(() => {
     void fetch("/api/projects", {
       method: "PATCH",
@@ -129,8 +123,6 @@ export function ProjectDetail({
       return project.status === "Construction started" ? "current" : "upcoming";
     return project.completion !== "Not scheduled" ? "current" : "upcoming";
   };
-  const goBack = () =>
-    currentIndex === 0 ? onClose() : setStep(steps[currentIndex - 1].id);
   const goNext = () =>
     currentIndex < steps.length - 1
       ? setStep(steps[currentIndex + 1].id)
@@ -156,24 +148,15 @@ export function ProjectDetail({
   };
 
   return (
-    <div
-      className="drawer-layer research-layer"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
+    <main
+      className="project-detail-page"
+      aria-label={`${project.name} research journey`}
     >
-      <aside
-        className="detail-drawer research-drawer"
-        role="dialog"
-        aria-modal="true"
-        aria-label={`${project.name} research journey`}
-      >
+      <div className="project-detail-frame">
         <header className="research-header">
-          <button className="research-back" onClick={goBack}>
+          <button className="research-back" onClick={onClose}>
             <ArrowLeft size={17} />
-            {currentIndex === 0
-              ? "Back to map"
-              : `Back to ${steps[currentIndex - 1].label}`}
+            {backLabel}
           </button>
           <div>
             <span className="eyebrow">PROJECT RESEARCH</span>
@@ -183,13 +166,6 @@ export function ProjectDetail({
               {project.area}, India
             </p>
           </div>
-          <button
-            className="icon-button"
-            onClick={onClose}
-            aria-label="Close research journey"
-          >
-            <X size={19} />
-          </button>
         </header>
 
         <nav className="research-steps" aria-label="Project research progress">
@@ -212,6 +188,22 @@ export function ProjectDetail({
               {item.label}
             </button>
           ))}
+          <button
+            className="research-next-tab"
+            onClick={goNext}
+            aria-label={
+              currentIndex === steps.length - 1
+                ? "Go to project actions"
+                : `Next: ${steps[currentIndex + 1].label}`
+            }
+          >
+            <span className="research-next-label">
+              {currentIndex === steps.length - 1
+                ? "Actions"
+                : steps[currentIndex + 1].label}
+            </span>
+            <ArrowRight size={17} />
+          </button>
         </nav>
 
         <div className="research-content">
@@ -498,17 +490,6 @@ export function ProjectDetail({
           )}
         </div>
 
-        <div className="research-next">
-          <span>
-            Step {currentIndex + 1} of {steps.length}
-          </span>
-          <button onClick={goNext}>
-            {currentIndex === steps.length - 1
-              ? "Ready to act"
-              : `Next: ${steps[currentIndex + 1].label}`}
-            <ArrowRight size={16} />
-          </button>
-        </div>
         <div className="research-action-bar" aria-label="Project actions">
           <button
             className="contact"
@@ -526,8 +507,8 @@ export function ProjectDetail({
             Share
           </button>
         </div>
-      </aside>
-    </div>
+      </div>
+    </main>
   );
 }
 

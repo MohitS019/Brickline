@@ -39,9 +39,11 @@ const readStored = <T,>(key: string): T[] => {
 export default function WorkspaceApp({
   panelAccess,
   panelContent: initialPanelContent,
+  initialProjectId = null,
 }: {
   panelAccess: PanelAccess;
   panelContent: PanelContent;
+  initialProjectId?: string | null;
 }) {
   const [panelContent, setPanelContent] = useState(initialPanelContent);
   const [view, setView] = useState<ViewId>(
@@ -53,7 +55,11 @@ export default function WorkspaceApp({
   const [mobileOpen, setMobileOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const [projectId, setProjectId] = useState<string | null>(null);
+  const [projectId, setProjectId] = useState<string | null>(initialProjectId);
+  const [projectOrigin, setProjectOrigin] = useState<{
+    view: ViewId;
+    scrollY: number;
+  } | null>(initialProjectId ? { view: "projects", scrollY: 0 } : null);
   const [toast, setToast] = useState("");
   const [form, setForm] = useState<FormKind | null>(null);
   const [messageRecipient, setMessageRecipient] = useState("");
@@ -68,6 +74,35 @@ export default function WorkspaceApp({
   const [alerts, setAlerts] = useState<AlertItem[]>([]);
   const [areaSignals, setAreaSignals] = useState<AreaSignal[]>([]);
   const notify = useCallback((message: string) => setToast(message), []);
+
+  useEffect(() => {
+    if (initialProjectId && !window.history.state?.bricklineProject) {
+      window.history.replaceState(
+        { bricklineProject: initialProjectId, bricklineDirect: true },
+        "",
+        window.location.pathname,
+      );
+    }
+    const handleHistory = (event: PopStateEvent) => {
+      const state = event.state as {
+        bricklineProject?: string;
+        bricklineView?: ViewId;
+        bricklineScroll?: number;
+      } | null;
+      if (state?.bricklineProject) {
+        setProjectId(state.bricklineProject);
+        window.scrollTo({ top: 0 });
+        return;
+      }
+      setProjectId(null);
+      if (state?.bricklineView) setView(state.bricklineView);
+      window.requestAnimationFrame(() =>
+        window.scrollTo({ top: state?.bricklineScroll || 0 }),
+      );
+    };
+    window.addEventListener("popstate", handleHistory);
+    return () => window.removeEventListener("popstate", handleHistory);
+  }, [initialProjectId]);
 
   useEffect(() => {
     // Keep old India-workspace records recoverable under their original keys.
@@ -143,13 +178,64 @@ export default function WorkspaceApp({
 
   const navigate = (next: ViewId) => {
     if (next === "admin" && !panelAccess.isAdmin) return;
+    if (projectId) {
+      window.history.replaceState(
+        { bricklineView: next, bricklineScroll: 0 },
+        "",
+        "/",
+      );
+      setProjectId(null);
+      setProjectOrigin(null);
+    }
     setView(next);
     window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+  const openProject = (id: string) => {
+    if (!id) return;
+    const origin = projectOrigin || { view, scrollY: window.scrollY };
+    if (!projectId) {
+      window.history.replaceState(
+        {
+          ...(window.history.state || {}),
+          bricklineView: origin.view,
+          bricklineScroll: origin.scrollY,
+        },
+        "",
+        window.location.href,
+      );
+      setProjectOrigin(origin);
+    }
+    window.history.pushState(
+      { bricklineProject: id },
+      "",
+      `/projects/${encodeURIComponent(id)}`,
+    );
+    setProjectId(id);
+    window.scrollTo({ top: 0 });
+  };
+  const closeProject = () => {
+    if (
+      window.history.state?.bricklineProject &&
+      !window.history.state?.bricklineDirect
+    ) {
+      window.history.back();
+      return;
+    }
+    const target = projectOrigin?.view || "projects";
+    window.history.replaceState(
+      { bricklineView: target, bricklineScroll: projectOrigin?.scrollY || 0 },
+      "",
+      "/",
+    );
+    setProjectId(null);
+    setView(target);
+    window.requestAnimationFrame(() =>
+      window.scrollTo({ top: projectOrigin?.scrollY || 0 }),
+    );
   };
   const changeRole = (next: Role) => {
     if (!panelAccess.allowedRoles.includes(next)) return;
     setRole(next);
-    setProjectId(null);
     setForm(null);
     navigate(next === "Agent" ? "map" : "client-access");
   };
@@ -194,7 +280,7 @@ export default function WorkspaceApp({
           throw new Error(saved.error || "Project could not be registered.");
         setProjects((current) => [saved.project!, ...current]);
         navigate("map");
-        setProjectId(saved.project.id);
+        openProject(saved.project.id);
         notify("Project registered securely");
       } catch (cause) {
         notify(
@@ -268,7 +354,7 @@ export default function WorkspaceApp({
       content = (
         <MapView
           items={projects}
-          onProject={setProjectId}
+          onProject={openProject}
           onAdd={requestProjectForm}
           onNavigate={navigate}
         />
@@ -279,7 +365,7 @@ export default function WorkspaceApp({
         <ProjectsView
           items={projects}
           saved={savedProjects}
-          onProject={setProjectId}
+          onProject={openProject}
           onSave={(id) =>
             toggleSet(
               setSavedProjects,
@@ -298,7 +384,7 @@ export default function WorkspaceApp({
         <NetworkView
           items={projects}
           role={role}
-          onProject={setProjectId}
+          onProject={openProject}
           onAdd={requestProjectForm}
         />
       );
@@ -307,7 +393,7 @@ export default function WorkspaceApp({
       content = (
         <AreasView
           items={projects}
-          onProject={setProjectId}
+          onProject={openProject}
           onWatch={(area) => {
             setFormArea(area);
             setForm("alert");
@@ -369,7 +455,7 @@ export default function WorkspaceApp({
           onDelete={(id) =>
             setAlerts((current) => current.filter((alert) => alert.id !== id))
           }
-          onProject={setProjectId}
+          onProject={openProject}
           onSettings={() => navigate("profile")}
         />
       );
@@ -397,7 +483,7 @@ export default function WorkspaceApp({
             panelAccess.allowedRoles.length === 3
           }
           onNavigate={navigate}
-          onProject={setProjectId}
+          onProject={openProject}
           onProjectsChange={(changed) =>
             setProjects((current) =>
               current.map((project) =>
@@ -438,7 +524,38 @@ export default function WorkspaceApp({
         onMobileToggle={() => setMobileOpen(!mobileOpen)}
         onSearch={() => setSearchOpen(true)}
       >
-        {content}
+        <div hidden={Boolean(projectId)}>{content}</div>
+        {projectId && (
+          <ProjectDetail
+            key={projectId}
+            id={projectId}
+            items={projects}
+            signals={areaSignals}
+            role={role}
+            saved={savedProjects.has(projectId)}
+            onClose={closeProject}
+            onSave={() =>
+              toggleSet(
+                setSavedProjects,
+                projectId,
+                "Project saved",
+                "Project removed from saved",
+              )
+            }
+            onNotify={notify}
+            onProject={openProject}
+            onContact={(recipient) => {
+              setMessageRecipient(recipient);
+              setForm("message");
+            }}
+            onOpenArea={() => navigate("areas")}
+            backLabel={
+              projectOrigin?.view === "map" || projectOrigin?.view === "areas"
+                ? "Back to map"
+                : "Back to projects"
+            }
+          />
+        )}
       </AppShell>
       {searchOpen && (
         <GlobalSearch
@@ -450,36 +567,7 @@ export default function WorkspaceApp({
             setQuery("");
           }}
           onNavigate={navigate}
-          onProject={setProjectId}
-        />
-      )}
-      {projectId && (
-        <ProjectDetail
-          key={projectId}
-          id={projectId}
-          items={projects}
-          signals={areaSignals}
-          role={role}
-          saved={savedProjects.has(projectId)}
-          onClose={() => setProjectId(null)}
-          onSave={() =>
-            toggleSet(
-              setSavedProjects,
-              projectId,
-              "Project saved",
-              "Project removed from saved",
-            )
-          }
-          onNotify={notify}
-          onProject={setProjectId}
-          onContact={(recipient) => {
-            setMessageRecipient(recipient);
-            setForm("message");
-          }}
-          onOpenArea={() => {
-            setProjectId(null);
-            navigate("areas");
-          }}
+          onProject={openProject}
         />
       )}
       {form && (
