@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { ArrowLeft, Building2, LockKeyhole, Plus, Search } from "lucide-react";
 import type { Project, Role } from "@/lib/brickline-data";
-import { googleMapEmbed } from "@/lib/project-map";
+import { InteractiveProjectMap } from "@/components/brickline/interactive-project-map";
 import {
   BuilderCard,
   DemoBadge,
@@ -87,9 +87,11 @@ export function NetworkView({
               <h2>{selected}</h2>
               <VerificationBadge
                 state={
-                  active.every((project) => project.isDemo)
-                    ? "pending"
-                    : "rera-verified"
+                  active.some(
+                    (project) => project.verificationState === "rera-verified",
+                  )
+                    ? "rera-verified"
+                    : active[0]?.verificationState || "pending"
                 }
               />
               {active.every((project) => project.isDemo) && <DemoBadge />}
@@ -164,14 +166,11 @@ export function NetworkView({
                 </div>
                 <div className="builder-footprint">
                   <span className="micro-label">INDIA PROJECT FOOTPRINT</span>
-                  <iframe
-                    title={`Project footprint for ${selected}`}
-                    src={googleMapEmbed(
-                      active[0]?.area ? `${active[0].area}, India` : "India",
-                      active[0]?.area ? 10 : 5,
-                    )}
-                    referrerPolicy="no-referrer-when-downgrade"
-                    allowFullScreen
+                  <InteractiveProjectMap
+                    projects={active}
+                    selectedId={null}
+                    focusProjects={active.length ? active : null}
+                    onSelect={onProject}
                   />
                 </div>
               </div>
@@ -207,9 +206,12 @@ export function NetworkView({
                   projectCount={projects.length}
                   primaryLocality={projects[0]?.area || "India"}
                   verification={
-                    projects.every((project) => project.isDemo)
-                      ? "pending"
-                      : "rera-verified"
+                    projects.some(
+                      (project) =>
+                        project.verificationState === "rera-verified",
+                    )
+                      ? "rera-verified"
+                      : projects[0]?.verificationState || "pending"
                   }
                   trailing={
                     role === "Client" ? <LockKeyhole size={15} /> : undefined

@@ -44,6 +44,7 @@ type ProjectRow = {
   viewCount: number;
   isDemo: number;
   updatedAt: number;
+  builderVerifiedAt: number | null;
 };
 
 export async function GET() {
@@ -78,7 +79,7 @@ export async function GET() {
   await ensureDemoData(db);
   const rows = await db
     .prepare(
-      "SELECT id, owner_user_id AS ownerUserId, name, area, country, site_address AS siteAddress, currency, rera_encrypted AS reraEncrypted, status, builder, value, homes, description, completion, latitude, longitude, published, view_count AS viewCount, is_demo AS isDemo, updated_at AS updatedAt FROM registered_projects ORDER BY updated_at DESC LIMIT 500",
+      "SELECT p.id, p.owner_user_id AS ownerUserId, p.name, p.area, p.country, p.site_address AS siteAddress, p.currency, p.rera_encrypted AS reraEncrypted, p.status, p.builder, p.value, p.homes, p.description, p.completion, p.latitude, p.longitude, p.published, p.view_count AS viewCount, p.is_demo AS isDemo, p.updated_at AS updatedAt, a.verified_at AS builderVerifiedAt FROM registered_projects p LEFT JOIN builder_access_requests a ON a.user_id = p.owner_user_id ORDER BY p.updated_at DESC LIMIT 500",
     )
     .all<ProjectRow>();
   const projects = await Promise.all(
@@ -119,6 +120,11 @@ export async function GET() {
         viewCount: row.viewCount,
         ownedByMe: row.ownerUserId === user.userId,
         isDemo: Boolean(row.isDemo),
+        verificationState: row.builderVerifiedAt
+          ? "rera-verified"
+          : row.isDemo
+            ? "pending"
+            : "unverified",
       })),
   );
   return secureJson({ projects });
@@ -293,6 +299,7 @@ export async function POST(request: Request) {
         published: false,
         viewCount: 0,
         ownedByMe: true,
+        verificationState: "rera-verified",
       },
     },
     201,

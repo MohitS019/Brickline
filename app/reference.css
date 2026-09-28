@@ -923,6 +923,10 @@ textarea:focus-visible {
   left: 14px;
   top: 12px;
   pointer-events: none;
+  background: #fffdf8e8;
+  border: 1px solid #dfd3c1;
+  padding: 7px 9px;
+  box-shadow: 0 5px 14px #2d241c1f;
 }
 .area-preview-label span {
   display: block;
@@ -2507,7 +2511,7 @@ textarea:focus-visible {
 }
 .admin-verification-details {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 8px;
   padding: 0 15px 14px;
 }
@@ -2564,11 +2568,24 @@ textarea:focus-visible {
   font-weight: 500;
 }
 .area-map-preview iframe,
-.builder-footprint iframe {
+.builder-footprint iframe,
+.area-map-preview .interactive-project-map,
+.builder-footprint .interactive-project-map,
+.project-location-map .interactive-project-map {
   width: 100%;
   height: 100%;
   border: 0;
   display: block;
+}
+.area-map-preview .interactive-project-map,
+.builder-footprint .interactive-project-map {
+  min-height: 0;
+}
+.area-score strong small {
+  display: inline;
+  margin-left: 4px;
+  color: var(--muted);
+  font-size: 0.9rem;
 }
 @media (max-width: 1050px) {
   .admin-content-grid {
@@ -3602,17 +3619,51 @@ button.entity-project-builder:hover {
 .entity-project-visual {
   width: 100%;
   aspect-ratio: 16 / 9;
-  background: linear-gradient(145deg, #f4ecdd, #e9dcc6);
+  background:
+    linear-gradient(
+      var(--visual-angle),
+      color-mix(in srgb, var(--project-color) 58%, transparent),
+      transparent 64%
+    ),
+    repeating-linear-gradient(
+      90deg,
+      transparent 0 28px,
+      color-mix(in srgb, var(--project-color) 14%, transparent) 29px 31px
+    ),
+    linear-gradient(
+      135deg,
+      hsl(var(--visual-hue) 30% 88%),
+      #f4ecdd var(--visual-shift),
+      #e5d6bd
+    );
   display: grid;
   place-items: center;
   color: var(--project-color);
   position: relative;
 }
-.entity-project-visual > svg {
+.entity-project-visual-mark {
+  width: clamp(64px, 24%, 92px);
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 5px;
+  color: var(--project-color);
+  background: color-mix(in srgb, white 78%, transparent);
+  border: 1px solid color-mix(in srgb, var(--project-color) 35%, white);
+  box-shadow: 10px 10px 0 color-mix(in srgb, var(--project-color) 20%, white);
+}
+.entity-project-visual-mark > svg {
   filter: drop-shadow(
     0 9px 12px color-mix(in srgb, var(--project-color) 24%, transparent)
   );
   stroke-width: 1.35;
+}
+.entity-project-visual-mark small {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 0.58rem;
+  font-weight: 900;
+  letter-spacing: 1.6px;
 }
 .entity-save {
   position: absolute;
@@ -3722,7 +3773,18 @@ button.entity-project-builder:hover {
   aspect-ratio: 16 / 9;
   display: grid;
   place-items: center;
-  background: #f0e6d5;
+  background:
+    linear-gradient(
+      var(--visual-angle),
+      color-mix(in srgb, var(--project-color) 48%, transparent),
+      transparent 68%
+    ),
+    repeating-linear-gradient(
+      90deg,
+      transparent 0 11px,
+      color-mix(in srgb, var(--project-color) 16%, transparent) 12px 13px
+    ),
+    hsl(var(--visual-hue) 28% 89%);
   color: var(--project-color);
 }
 .entity-project-copy {
@@ -3807,6 +3869,19 @@ button.entity-project-builder:hover {
   gap: 4px;
   min-width: 0;
 }
+.entity-builder-verification {
+  display: grid;
+  justify-items: start;
+  gap: 4px;
+}
+.entity-builder-verification > small {
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+}
 .entity-builder-secondary,
 .entity-builder-locality {
   display: flex;
@@ -3845,6 +3920,19 @@ button.entity-project-builder:hover {
 }
 .entity-builder-card.admin .admin-status {
   margin-left: 5px;
+}
+.admin-account-status-field {
+  display: grid;
+  justify-items: end;
+  gap: 5px;
+}
+.admin-account-status-field > small {
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
 }
 .builder-cards > .entity-builder-card {
   min-height: 120px;
@@ -4086,9 +4174,11 @@ button.entity-project-builder:hover {
     grid-row: 2;
   }
   .entity-builder-card.admin .admin-status {
-    grid-column: 2;
-    justify-self: start;
     margin: 4px 0 0;
+  }
+  .admin-account-status-field {
+    grid-column: 2;
+    justify-items: start;
   }
   .entity-project-facts {
     grid-template-columns: 1fr 1fr;

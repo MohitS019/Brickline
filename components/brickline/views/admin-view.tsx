@@ -37,6 +37,40 @@ type Account = {
   isDemo?: boolean;
 };
 type Action = "approve" | "decline" | "suspend" | "restore" | "set-panels";
+
+const documentVerification = (
+  account: Account,
+): "rera-verified" | "pending" | "unverified" =>
+  account.verifiedAt
+    ? "rera-verified"
+    : ["declined", "suspended"].includes(account.status)
+      ? "unverified"
+      : "pending";
+
+const verificationCaption = (account: Account) =>
+  account.requestedRole === "Client"
+    ? "Identity verification"
+    : account.requestedRole === "Agent"
+      ? "RERA verification"
+      : "RERA/GST verification";
+
+const verificationDetail = (account: Account) => {
+  if (account.verifiedAt)
+    return account.requestedRole === "Client"
+      ? "Provider identity verified"
+      : "RERA/GST document review completed";
+  if (account.requestedRole === "Client")
+    return "Provider identity review pending";
+  const pending = [
+    !account.reraNumber ? "RERA registration" : "RERA document review",
+    account.requestedRole === "Builder"
+      ? !account.gstNumber
+        ? "GST registration"
+        : "GST document review"
+      : null,
+  ].filter(Boolean);
+  return `${pending.join(" and ")} pending`;
+};
 const panels: {
   role: Role;
   key: "agentAccess" | "builderAccess" | "clientAccess";
@@ -318,27 +352,22 @@ export function AdminView({
                               account.name),
                         ).length
                       }
-                      verification={
-                        account.isDemo
-                          ? "pending"
-                          : account.status === "approved" &&
-                              Boolean(account.reraNumber)
-                            ? "rera-verified"
-                            : account.status === "pending"
-                              ? "pending"
-                              : "unverified"
-                      }
+                      verification={documentVerification(account)}
+                      verificationCaption={verificationCaption(account)}
                       trailing={
-                        <em
-                          className={`admin-status ${account.status}`}
-                          title={
-                            account.verifiedAt
-                              ? `Verified ${new Date(account.verifiedAt).toLocaleDateString()}`
-                              : undefined
-                          }
-                        >
-                          {account.status}
-                        </em>
+                        <span className="admin-account-status-field">
+                          <small>Account status</small>
+                          <em
+                            className={`admin-status ${account.status}`}
+                            title={
+                              account.reviewedAt
+                                ? `Reviewed ${new Date(account.reviewedAt).toLocaleDateString()}`
+                                : undefined
+                            }
+                          >
+                            {account.status}
+                          </em>
+                        </span>
                       }
                     />
                     {account.isDemo && (
@@ -349,16 +378,20 @@ export function AdminView({
                     )}
                     <div className="admin-verification-details">
                       <span>
+                        <b>Document verification</b>
+                        {verificationDetail(account)}
+                      </span>
+                      <span>
                         <b>Phone</b>
                         {account.phone || "Provider email only"}
                       </span>
                       <span>
                         <b>RERA</b>
-                        {account.reraNumber || "Not required"}
+                        {account.reraNumber || "Not supplied"}
                       </span>
                       <span>
                         <b>GST</b>
-                        {account.gstNumber || "Not required"}
+                        {account.gstNumber || "Not supplied"}
                       </span>
                       <span>
                         <b>Address / contact</b>

@@ -23,6 +23,7 @@ import {
 } from "@/lib/brickline-data";
 import { projectMapLocation } from "@/lib/project-map";
 import { ProjectStatusBadge } from "@/components/brickline/entity-cards";
+import { InteractiveProjectMap } from "@/components/brickline/interactive-project-map";
 
 type ResearchStep = "overview" | "timeline" | "developer" | "projects" | "area";
 
@@ -277,13 +278,11 @@ export function ProjectDetail({
                     : `Showing the ${location.label} area. The builder has not supplied an exact site address.`}
                 </p>
                 <div className="project-location-map">
-                  <iframe
-                    key={location.embedUrl}
-                    title={`Map for ${project.name}`}
-                    src={location.embedUrl}
-                    loading="lazy"
-                    referrerPolicy="no-referrer-when-downgrade"
-                    allowFullScreen
+                  <InteractiveProjectMap
+                    projects={[project]}
+                    selectedId={project.id}
+                    focusProjects={location.coordinates ? [project] : null}
+                    onSelect={() => undefined}
                   />
                 </div>
               </section>

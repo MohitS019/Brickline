@@ -66,6 +66,19 @@ export function ProjectStatusBadge({ status }: { status: ProjectStatus }) {
   );
 }
 
+function projectVisualStyle(project: Project): CSSProperties {
+  const hash = [...project.name].reduce(
+    (value, character) => (value * 31 + character.charCodeAt(0)) >>> 0,
+    17,
+  );
+  return {
+    "--project-color": statusColor[project.status],
+    "--visual-hue": `${hash % 360}`,
+    "--visual-angle": `${25 + (hash % 120)}deg`,
+    "--visual-shift": `${18 + (hash % 48)}%`,
+  } as CSSProperties;
+}
+
 export function ProjectCard({
   project,
   variant = "full",
@@ -83,9 +96,8 @@ export function ProjectCard({
   onBuilder?: () => void;
   cornerAction?: ReactNode;
 }) {
-  const verification: VerificationState = project.isDemo
-    ? "pending"
-    : "rera-verified";
+  const verification: VerificationState =
+    project.verificationState || (project.isDemo ? "pending" : "rera-verified");
   const openFromKey = (event: KeyboardEvent<HTMLElement>) => {
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
@@ -118,9 +130,7 @@ export function ProjectCard({
       >
         <span
           className="entity-project-thumb"
-          style={
-            { "--project-color": statusColor[project.status] } as CSSProperties
-          }
+          style={projectVisualStyle(project)}
         >
           <Building2 size={19} />
         </span>
@@ -146,11 +156,12 @@ export function ProjectCard({
       {cornerAction}
       <div
         className="entity-project-visual"
-        style={
-          { "--project-color": statusColor[project.status] } as CSSProperties
-        }
+        style={projectVisualStyle(project)}
       >
-        <Building2 size={variant === "popover" ? 30 : 58} />
+        <span className="entity-project-visual-mark">
+          <Building2 size={variant === "popover" ? 30 : 52} />
+          <small>{project.name.slice(0, 2).toUpperCase()}</small>
+        </span>
         {onSave && (
           <button
             className={saved ? "entity-save saved" : "entity-save"}
@@ -205,6 +216,7 @@ export function BuilderCard({
   projectCount,
   primaryLocality,
   verification = "rera-verified",
+  verificationCaption,
   variant = "card",
   secondary,
   trailing,
@@ -214,6 +226,7 @@ export function BuilderCard({
   projectCount: number;
   primaryLocality: string;
   verification?: VerificationState;
+  verificationCaption?: string;
   variant?: "card" | "row" | "admin";
   secondary?: string;
   trailing?: ReactNode;
@@ -251,7 +264,14 @@ export function BuilderCard({
           <MapPin size={12} />
           {primaryLocality}
         </span>
-        <VerificationBadge state={verification} />
+        {verificationCaption ? (
+          <span className="entity-builder-verification">
+            <small>{verificationCaption}</small>
+            <VerificationBadge state={verification} />
+          </span>
+        ) : (
+          <VerificationBadge state={verification} />
+        )}
       </span>
       <span className="entity-builder-count">
         <b>{projectCount}</b> {projectCount === 1 ? "project" : "projects"}

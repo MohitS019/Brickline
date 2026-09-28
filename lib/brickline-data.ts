@@ -39,6 +39,7 @@ export interface Project {
   viewCount?: number;
   ownedByMe?: boolean;
   isDemo?: boolean;
+  verificationState?: "rera-verified" | "pending" | "unverified";
 }
 
 export interface NetworkMember {

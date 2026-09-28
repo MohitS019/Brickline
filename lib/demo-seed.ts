@@ -36,6 +36,24 @@ const builders = [
   ],
 ] as const;
 
+const verifiedDemoBuilders = new Set([
+  "demo-builder-meridian",
+  "demo-builder-northstar",
+  "demo-builder-cedarline",
+]);
+
+async function syncDemoVerification(db: D1Database, verifiedAt: number) {
+  await db.batch(
+    builders.map(([id]) =>
+      db
+        .prepare(
+          "UPDATE builder_access_requests SET verified_at = ? WHERE user_id = ? AND is_demo = 1",
+        )
+        .bind(verifiedDemoBuilders.has(id) ? verifiedAt : null, id),
+    ),
+  );
+}
+
 const projects = [
   [
     "demo-project-meridian-one",
@@ -243,14 +261,16 @@ const signals = [
 ] as const;
 
 export async function ensureDemoData(db: D1Database) {
+  const requestedAt = Date.parse("2026-06-01T09:00:00Z");
+  const updatedAt = Date.parse("2026-09-20T09:00:00Z");
   const seeded = await db
     .prepare("SELECT id FROM registered_projects WHERE id = ? LIMIT 1")
     .bind("demo-project-meridian-one")
     .first();
-  if (seeded) return;
-
-  const requestedAt = Date.parse("2026-06-01T09:00:00Z");
-  const updatedAt = Date.parse("2026-09-20T09:00:00Z");
+  if (seeded) {
+    await syncDemoVerification(db, requestedAt);
+    return;
+  }
   const statements: D1PreparedStatement[] = [];
 
   for (const [id, email, name, company, address] of builders) {
@@ -269,7 +289,7 @@ export async function ensureDemoData(db: D1Database) {
           requestedAt,
           address,
           name,
-          requestedAt,
+          verifiedDemoBuilders.has(id) ? requestedAt : null,
         ),
     );
   }
@@ -346,4 +366,5 @@ export async function ensureDemoData(db: D1Database) {
   }
 
   await db.batch(statements);
+  await syncDemoVerification(db, requestedAt);
 }
