@@ -113,6 +113,7 @@ export async function POST(request: Request) {
       ? String(body[key]).trim().slice(0, max)
       : "";
   const role = field("role", 20) as Role;
+  const isPublicRequest = body?.source === "public-request";
   const company = field("company", 120);
   const name = field("name", 120) || user.displayName;
   const businessAddress = field("businessAddress", 300);
@@ -131,7 +132,7 @@ export async function POST(request: Request) {
     (!company ||
       !businessAddress ||
       !contactPerson ||
-      !validPhone(phone) ||
+      (!isPublicRequest && !validPhone(phone)) ||
       !validRera(reraNumber) ||
       !validGst(gstNumber))
   )
@@ -144,12 +145,16 @@ export async function POST(request: Request) {
     );
   if (
     role === "Agent" &&
-    (!name || !validPhone(phone) || !validRera(reraNumber))
+    (!name ||
+      (isPublicRequest && !businessAddress) ||
+      (!isPublicRequest && !validPhone(phone)) ||
+      !validRera(reraNumber) ||
+      (isPublicRequest && !validGst(gstNumber)))
   )
     return json(
       {
         error:
-          "Agents must provide full name, valid phone, and RERA agent registration number.",
+          "Agents must provide full name, city, RERA agent registration, and GST details.",
       },
       400,
     );

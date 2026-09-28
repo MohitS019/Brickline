@@ -46,9 +46,7 @@ export default function WorkspaceApp({
   initialProjectId?: string | null;
 }) {
   const [panelContent, setPanelContent] = useState(initialPanelContent);
-  const [view, setView] = useState<ViewId>(
-    panelAccess.isAdmin ? "admin" : "map",
-  );
+  const [view, setView] = useState<ViewId>("overview");
   const [role, setRole] = useState<Role>(
     panelAccess.allowedRoles[0] || "Agent",
   );

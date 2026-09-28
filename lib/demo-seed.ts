@@ -217,6 +217,49 @@ const projects = [
   ],
 ] as const;
 
+export const demoPublicProjects = projects.map(
+  ([
+    id,
+    owner,
+    name,
+    area,
+    siteAddress,
+    status,
+    builder,
+    value,
+    homes,
+    completion,
+    latitude,
+    longitude,
+    views,
+    description,
+  ]) => ({
+    id,
+    owner,
+    name,
+    area,
+    country: "India",
+    siteAddress,
+    currency: "INR",
+    status,
+    builder,
+    value,
+    homes,
+    completion,
+    confidence: 100,
+    updated: "Demo dataset",
+    description,
+    tags: ["Illustrative demo record"],
+    coordinates: { latitude, longitude },
+    published: true,
+    viewCount: views,
+    isDemo: true,
+    verificationState: verifiedDemoBuilders.has(owner)
+      ? ("rera-verified" as const)
+      : ("pending" as const),
+  }),
+);
+
 const signals = [
   [
     "demo-signal-bkc",
