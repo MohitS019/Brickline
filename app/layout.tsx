@@ -4,10 +4,8 @@ import "./reference.css";
 
 export const metadata: Metadata = {
   title: "Brickline | India real estate intelligence",
-  description: "Explore verified Indian real estate projects, builders, and area intelligence.",
-  other: {
-    "codex-preview": "development",
-  },
+  description:
+    "Explore verified Indian real estate projects, builders, and area intelligence.",
   icons: {
     icon: "/favicon.svg",
     shortcut: "/favicon.svg",

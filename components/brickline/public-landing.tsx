@@ -87,13 +87,16 @@ const faqs = [
 export function PublicLanding({
   projects,
   signInHref,
+  appUrl,
 }: {
   projects: Project[];
   signInHref: string;
+  appUrl?: string;
 }) {
   const featured = projects.slice(0, 3);
+  const appHref = (path: string) => `${appUrl || ""}${path}`;
   const openProject = (id: string) =>
-    window.location.assign(`/projects/${encodeURIComponent(id)}`);
+    window.location.assign(appHref(`/projects/${encodeURIComponent(id)}`));
 
   return (
     <main className="public-site">
@@ -111,9 +114,9 @@ export function PublicLanding({
           <a href={signInHref} target="_top" className="public-login">
             Log in
           </a>
-          <Link href="/request-access" className="reference-primary">
+          <a href={appHref("/request-access")} className="reference-primary">
             Request access
-          </Link>
+          </a>
         </div>
       </header>
 
@@ -130,9 +133,9 @@ export function PublicLanding({
             from one verified professional workspace.
           </p>
           <div className="public-actions">
-            <Link href="/request-access" className="reference-primary">
+            <a href={appHref("/request-access")} className="reference-primary">
               Request access <ArrowRight size={16} />
-            </Link>
+            </a>
             <a href="#featured-map" className="public-secondary">
               Explore the map <MapPin size={16} />
             </a>
@@ -194,9 +197,9 @@ export function PublicLanding({
                   </li>
                 ))}
               </ul>
-              <Link href={`/request-access?role=${role.id}`}>
+              <a href={appHref(`/request-access?role=${role.id}`)}>
                 Request {role.id.toLowerCase()} access <ArrowRight size={15} />
-              </Link>
+              </a>
             </article>
           ))}
         </div>
@@ -287,9 +290,9 @@ export function PublicLanding({
       <section className="public-final-cta">
         <span className="micro-label">READY TO ENTER THE WORKSPACE?</span>
         <h2>Start with the map. Continue with verified context.</h2>
-        <Link href="/request-access" className="reference-primary">
+        <a href={appHref("/request-access")} className="reference-primary">
           Request access <ArrowRight size={16} />
-        </Link>
+        </a>
       </section>
 
       <footer className="public-footer">

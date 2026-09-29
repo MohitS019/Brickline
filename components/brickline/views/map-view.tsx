@@ -175,14 +175,20 @@ export function MapView({
                 setSearchOpen(true);
               }}
               placeholder="Search Indian locality, city, project, or builder..."
+              role="combobox"
               aria-autocomplete="list"
               aria-expanded={searchOpen}
+              aria-controls="map-search-suggestions"
             />
             <button>
               Explore map <ArrowRight size={15} />
             </button>
             {searchOpen && (
-              <div className="map-suggestions" role="listbox">
+              <div
+                className="map-suggestions"
+                role="listbox"
+                id="map-search-suggestions"
+              >
                 {suggestions.length ? (
                   suggestions.map((suggestion) => (
                     <button

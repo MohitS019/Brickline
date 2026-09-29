@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ArrowLeft, CheckCircle2, ShieldCheck } from "lucide-react";
 import type { Role } from "@/lib/brickline-data";
 import { BrandLogo } from "./brand-logo";
@@ -19,6 +20,7 @@ export function RequestAccessForm({
   signInHref: string;
   currentStatus: string | null;
 }) {
+  const router = useRouter();
   const [role, setRole] = useState<Role>(initialRole);
   const [name, setName] = useState("");
   const [company, setCompany] = useState("");
@@ -62,7 +64,8 @@ export function RequestAccessForm({
       if (!response.ok)
         throw new Error(result.error || "Could not submit your request.");
       if (result.instant) {
-        window.location.assign("/");
+        router.push("/");
+        router.refresh();
         return;
       }
       setSubmitted(true);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ArrowRight,
   Clock3,
@@ -54,6 +54,13 @@ const durations: { minutes: ShareMinutes; label: string }[] = [
   { minutes: 60, label: "1 hour" },
   { minutes: 120, label: "2 hours" },
 ];
+
+function formatRemaining(expiresAt: number, now: number) {
+  const seconds = Math.max(0, Math.floor((expiresAt - now) / 1000));
+  const hours = Math.floor(seconds / 3600);
+  const minutesLeft = Math.floor((seconds % 3600) / 60);
+  return `${hours ? `${hours}h ` : ""}${String(minutesLeft).padStart(2, "0")}m ${String(seconds % 60).padStart(2, "0")}s`;
+}
 
 export function ClientAccessView({
   role,
@@ -112,13 +119,15 @@ export function ClientAccessView({
       ),
     [projects, builder],
   );
+  const selectedProjectId = builderProjects.some(
+    (project) => project.id === projectId,
+  )
+    ? projectId
+    : builderProjects[0]?.id || "";
   const ownedProjects = projects.filter((project) => project.ownedByMe);
   const knownClients = [
     ...new Set(grants.map((grant) => grant.clientEmail).filter(Boolean)),
   ] as string[];
-  useEffect(() => {
-    setProjectId(builderProjects[0]?.id || "");
-  }, [builder, builderProjects]);
   useEffect(() => {
     const initial = window.setTimeout(() => setNow(Date.now()), 0);
     const timer = window.setInterval(() => setNow(Date.now()), 1_000);
@@ -127,60 +136,61 @@ export function ClientAccessView({
       window.clearInterval(timer);
     };
   }, []);
-  const remaining = (expiresAt: number) => {
-    const seconds = Math.max(0, Math.floor((expiresAt - now) / 1000));
-    const hours = Math.floor(seconds / 3600);
-    const minutesLeft = Math.floor((seconds % 3600) / 60);
-    return `${hours ? `${hours}h ` : ""}${String(minutesLeft).padStart(2, "0")}m ${String(seconds % 60).padStart(2, "0")}s`;
-  };
+  const remaining = (expiresAt: number) => formatRemaining(expiresAt, now);
   const grantState = (grant: ShareGrant) =>
     grant.revokedAt ? "revoked" : grant.expiresAt <= now ? "expired" : "active";
 
-  const denyAccess = (message: string, code?: string) => {
-    setSecureAccess(null);
-    onProject("");
-    setDenial({
-      title:
-        code === "revoked"
-          ? "Introduction revoked"
-          : code === "expired"
-            ? "Introduction expired"
-            : "Access denied",
-      message,
-    });
-  };
-
-  const openSecureGrant = async (token: string) => {
-    setBusy(true);
-    setError("");
-    try {
-      const response = await fetch("/api/client-grants", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "open", token }),
+  const denyAccess = useCallback(
+    (message: string, code?: string) => {
+      setSecureAccess(null);
+      onProject("");
+      setDenial({
+        title:
+          code === "revoked"
+            ? "Introduction revoked"
+            : code === "expired"
+              ? "Introduction expired"
+              : "Access denied",
+        message,
       });
-      const result = (await response.json()) as {
-        grant?: ShareGrant;
-        error?: string;
-        code?: string;
-      };
-      if (!response.ok || !result.grant)
-        return denyAccess(
-          result.error || "This secure introduction cannot be opened.",
-          result.code,
+    },
+    [onProject],
+  );
+
+  const openSecureGrant = useCallback(
+    async (token: string) => {
+      setBusy(true);
+      setError("");
+      try {
+        const response = await fetch("/api/client-grants", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "open", token }),
+        });
+        const result = (await response.json()) as {
+          grant?: ShareGrant;
+          error?: string;
+          code?: string;
+        };
+        if (!response.ok || !result.grant)
+          return denyAccess(
+            result.error || "This secure introduction cannot be opened.",
+            result.code,
+          );
+        setDenial(null);
+        setSecureAccess({ token, grant: result.grant });
+        setNotice(
+          `Shared by ${result.grant.agentName || "your agent"} · access expires in ${formatRemaining(result.grant.expiresAt, Date.now())}.`,
         );
-      setDenial(null);
-      setSecureAccess({ token, grant: result.grant });
-      setNotice(
-        `Shared by ${result.grant.agentName || "your agent"} · access expires in ${remaining(result.grant.expiresAt)}.`,
-      );
-      if (result.grant.projectId) onProject(result.grant.projectId);
-    } catch {
-      denyAccess("The secure introduction could not be validated.");
-    } finally {
-      setBusy(false);
-    }
-  };
+        if (result.grant.projectId) onProject(result.grant.projectId);
+      } catch {
+        denyAccess("The secure introduction could not be validated.");
+      } finally {
+        setBusy(false);
+      }
+    },
+    [denyAccess, onProject],
+  );
 
   useEffect(() => {
     let active = true;
@@ -218,7 +228,7 @@ export function ClientAccessView({
     return () => {
       active = false;
     };
-  }, [role]);
+  }, [openSecureGrant, role]);
 
   useEffect(() => {
     if (role !== "Client" || !secureAccess) return;
@@ -249,11 +259,15 @@ export function ClientAccessView({
       window.clearInterval(interval);
       window.clearTimeout(expiry);
     };
-  }, [role, secureAccess]);
+  }, [denyAccess, role, secureAccess]);
 
   const createGrant = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!/^\S+@\S+\.\S+$/.test(clientEmail.trim()) || !builder || !projectId) {
+    if (
+      !/^\S+@\S+\.\S+$/.test(clientEmail.trim()) ||
+      !builder ||
+      !selectedProjectId
+    ) {
       setError("Choose a valid client account, builder, and project.");
       return;
     }
@@ -267,7 +281,7 @@ export function ClientAccessView({
         body: JSON.stringify({
           clientEmail,
           builderProfileId: builder,
-          projectId,
+          projectId: selectedProjectId,
           minutes,
         }),
       });
@@ -754,7 +768,7 @@ export function ClientAccessView({
             <label>
               Project
               <select
-                value={projectId}
+                value={selectedProjectId}
                 onChange={(event) => setProjectId(event.target.value)}
                 disabled={!builder}
               >
@@ -794,7 +808,7 @@ export function ClientAccessView({
             <button
               type="submit"
               className="reference-primary"
-              disabled={!projectId || busy}
+              disabled={!selectedProjectId || busy}
             >
               <Plus size={15} />
               {busy ? "Creating…" : "Create secure link"}

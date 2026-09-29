@@ -7,6 +7,7 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import { statusColor, type Project } from "@/lib/brickline-data";
 
 const INDIA_CENTER: [number, number] = [78.9629, 20.5937];
+maplibregl.setWorkerUrl("/maplibre/maplibre-gl-worker.mjs");
 
 function featureCollection(
   projects: Project[],
@@ -51,7 +52,11 @@ export function InteractiveProjectMap({
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const selectRef = useRef(onSelect);
-  selectRef.current = onSelect;
+  const initialProjectsRef = useRef(projects);
+  const initialSelectedIdRef = useRef(selectedId);
+  useEffect(() => {
+    selectRef.current = onSelect;
+  }, [onSelect]);
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
     const map = new maplibregl.Map({
@@ -85,7 +90,7 @@ export function InteractiveProjectMap({
     map.on("load", () => {
       map.addSource("projects", {
         type: "geojson",
-        data: featureCollection(projects),
+        data: featureCollection(initialProjectsRef.current),
         cluster: true,
         clusterMaxZoom: 13,
         clusterRadius: 46,
@@ -121,7 +126,7 @@ export function InteractiveProjectMap({
         paint: {
           "circle-radius": [
             "case",
-            ["==", ["get", "projectId"], selectedId || ""],
+            ["==", ["get", "projectId"], initialSelectedIdRef.current || ""],
             11,
             8,
           ],
@@ -185,7 +190,8 @@ export function InteractiveProjectMap({
       (map.getSource("projects") as GeoJSONSource | undefined)?.setData(
         featureCollection(projects),
       );
-    map.loaded() ? update() : map.once("load", update);
+    if (map.loaded()) update();
+    else map.once("load", update);
   }, [projects]);
   useEffect(() => {
     const map = mapRef.current;
