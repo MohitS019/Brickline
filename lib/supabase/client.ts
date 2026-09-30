@@ -6,8 +6,8 @@ import { requireSupabasePublicConfig } from "./config";
 let browserClient: ReturnType<typeof createBrowserClient> | undefined;
 
 export function createClient() {
-  const { url, anonKey } = requireSupabasePublicConfig();
-  browserClient ??= createBrowserClient(url, anonKey);
+  const { url, publishableKey } = requireSupabasePublicConfig();
+  browserClient ??= createBrowserClient(url, publishableKey);
   return browserClient;
 }
 

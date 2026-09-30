@@ -112,11 +112,20 @@ role-aware workspace.
 
 | Variable                            | Exposure    | Purpose                                      |
 | ----------------------------------- | ----------- | -------------------------------------------- |
-| `NEXT_PUBLIC_SUPABASE_URL`          | Browser     | Supabase project URL                         |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY`     | Browser     | Publishable/anon key governed by RLS         |
-| `SUPABASE_SERVICE_ROLE_KEY`         | Server only | Admin operations; never expose to the client |
-| `BRICKLINE_GRANT_SECRET`            | Server only | HMAC signing secret for timed introductions  |
-| `BRICKLINE_DATA_SECRET`             | Server only | Device-binding fingerprint secret            |
+| `NEXT_PUBLIC_SUPABASE_URL`             | Browser     | Supabase project URL                          |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Browser     | `sb_publishable_…` key governed by RLS        |
+| `SUPABASE_SECRET_KEY`                  | Server only | `sb_secret_…` key; never expose to the client |
+| `BRICKLINE_APP_SECRET`                 | Server only | 32+ random bytes used for derived app keys    |
+
+`BRICKLINE_ADMIN_EMAIL` is optional and defaults to `mohitsonje4@gmail.com`.
+Account passwords are not environment variables: Supabase Auth salts and hashes
+them internally. Never reuse an account password as `BRICKLINE_APP_SECRET`.
+Generate the app secret locally, then copy the output into `.env.local` and
+Vercel's encrypted environment variables:
+
+```powershell
+node -e "console.log(require('node:crypto').randomBytes(32).toString('base64url'))"
+```
 
 The protected Admin workspace is available at `/admin`. The database migration
 promotes only the verified Supabase account `mohitsonje4@gmail.com`; all other
@@ -207,9 +216,8 @@ for user-facing details.
 1. Import this GitHub repository into Vercel.
 2. Keep the framework preset as **Next.js**.
 3. The committed `vercel.json` runs `npm ci` and `npm run build:vercel`.
-4. Add all five environment variables from `.env.example`; keep
-   `SUPABASE_SERVICE_ROLE_KEY`, `BRICKLINE_GRANT_SECRET`, and
-   `BRICKLINE_DATA_SECRET` restricted to the server.
+4. Add the four environment variables from `.env.example`; keep
+   `SUPABASE_SECRET_KEY` and `BRICKLINE_APP_SECRET` restricted to the server.
 5. Apply the Supabase migrations, configure the Auth Site URL and redirect URLs,
    then deploy. Pull requests receive preview deployments through Vercel's normal Git
    integration.

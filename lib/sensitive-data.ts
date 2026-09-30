@@ -1,12 +1,11 @@
 import "server-only";
+import { deriveAppSecret } from "@/lib/app-secrets";
 const encoder = new TextEncoder(); const decoder = new TextDecoder();
-const secret = () => process.env.BRICKLINE_DATA_SECRET || "";
-async function key() { return crypto.subtle.importKey("raw", await crypto.subtle.digest("SHA-256", encoder.encode(secret())), "AES-GCM", false, ["encrypt", "decrypt"]); }
+async function key() { return crypto.subtle.importKey("raw", await deriveAppSecret("data-encryption"), "AES-GCM", false, ["encrypt", "decrypt"]); }
 const pack = (bytes: Uint8Array) => btoa(String.fromCharCode(...bytes));
 const unpack = (value: string) => Uint8Array.from(atob(value), character => character.charCodeAt(0));
 
 export async function encryptSensitive(value: string) {
-  if (!secret()) throw new Error("Sensitive-data encryption unavailable");
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const encrypted = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv }, await key(), encoder.encode(value)));
   return `${pack(iv)}.${pack(encrypted)}`;
@@ -17,8 +16,7 @@ export async function decryptSensitive(value: string) {
 }
 
 export async function fingerprintSensitive(value: string) {
-  if (!secret()) throw new Error("Sensitive-data fingerprinting unavailable");
-  const signingKey = await crypto.subtle.importKey("raw", encoder.encode(secret()), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const signingKey = await crypto.subtle.importKey("raw", await deriveAppSecret("data-fingerprint"), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
   const signature = new Uint8Array(await crypto.subtle.sign("HMAC", signingKey, encoder.encode(value.trim().toUpperCase().replace(/\s+/g, ""))));
   return Array.from(signature, byte => byte.toString(16).padStart(2, "0")).join("");
 }

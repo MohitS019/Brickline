@@ -1,4 +1,5 @@
 import "server-only";
+import { deriveAppSecret } from "@/lib/app-secrets";
 export type GrantClaims = {
   jti: string;
   sub: string;
@@ -17,12 +18,10 @@ const decode = (value: string) =>
       .replace(/_/g, "/")
       .padEnd(Math.ceil(value.length / 4) * 4, "="),
   );
-const secret = () => process.env.BRICKLINE_GRANT_SECRET || "";
-
 async function signature(input: string) {
   const key = await crypto.subtle.importKey(
     "raw",
-    encoder.encode(secret()),
+    await deriveAppSecret("grant-signing"),
     { name: "HMAC", hash: "SHA-256" },
     false,
     ["sign"],
@@ -40,7 +39,7 @@ async function validSignature(input: string, value: string) {
   try {
     const key = await crypto.subtle.importKey(
       "raw",
-      encoder.encode(secret()),
+      await deriveAppSecret("grant-signing"),
       { name: "HMAC", hash: "SHA-256" },
       false,
       ["verify"],
@@ -61,7 +60,6 @@ async function validSignature(input: string, value: string) {
 }
 
 export async function createGrantToken(claims: GrantClaims) {
-  if (!secret()) throw new Error("Grant signing is unavailable");
   const header = encode(JSON.stringify({ alg: "HS256", typ: "JWT" }));
   const payload = encode(JSON.stringify(claims));
   const input = `${header}.${payload}`;
@@ -71,7 +69,7 @@ export async function createGrantToken(claims: GrantClaims) {
 export async function verifyGrantToken(
   token: string,
 ): Promise<GrantClaims | null> {
-  if (!secret() || token.length > 3000) return null;
+  if (token.length > 3000) return null;
   const parts = token.split(".");
   if (parts.length !== 3) return null;
   const input = `${parts[0]}.${parts[1]}`;

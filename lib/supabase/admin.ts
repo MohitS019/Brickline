@@ -2,12 +2,12 @@ import "server-only";
 import { createClient } from "@supabase/supabase-js";
 import {
   requireSupabasePublicConfig,
-  requireSupabaseServiceRoleKey,
+  requireSupabaseSecretKey,
 } from "./config";
 
 export function createAdminClient() {
   const { url } = requireSupabasePublicConfig();
-  return createClient(url, requireSupabaseServiceRoleKey(), {
+  return createClient(url, requireSupabaseSecretKey(), {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 }
