@@ -1,5 +1,4 @@
-import { env } from "cloudflare:workers";
-
+import "server-only";
 export type GrantClaims = {
   jti: string;
   sub: string;
@@ -18,8 +17,7 @@ const decode = (value: string) =>
       .replace(/_/g, "/")
       .padEnd(Math.ceil(value.length / 4) * 4, "="),
   );
-const secret = () =>
-  (env as { BRICKLINE_GRANT_SECRET?: string }).BRICKLINE_GRANT_SECRET || "";
+const secret = () => process.env.BRICKLINE_GRANT_SECRET || "";
 
 async function signature(input: string) {
   const key = await crypto.subtle.importKey(

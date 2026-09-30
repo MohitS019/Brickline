@@ -2002,6 +2002,32 @@ textarea:focus-visible {
 .approval-card .reference-primary:disabled {
   opacity: 0.55;
 }
+.approval-actions {
+  display: grid;
+  gap: 8px;
+  margin-top: 20px;
+}
+.approval-actions .reference-primary {
+  margin: 0;
+}
+.reference-secondary {
+  min-height: 38px;
+  padding: 0 14px;
+  border: 1px solid #cfc4b5;
+  border-radius: 4px;
+  color: var(--ink);
+  background: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 0.73rem;
+  font-weight: 800;
+}
+.reference-secondary:hover {
+  border-color: var(--coral);
+  color: var(--coral);
+}
 .approval-card > small {
   display: block;
   color: var(--muted);

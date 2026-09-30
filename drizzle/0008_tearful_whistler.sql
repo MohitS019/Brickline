@@ -1,1 +1,0 @@
-ALTER TABLE `client_access_grants` ADD `expiry_logged_at` integer;

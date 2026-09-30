@@ -1,123 +1,61 @@
 import { getChatGPTUser } from "@/app/chatgpt-auth";
-import { isBricklineAdmin, getPanelDb } from "@/lib/panel-access";
-import {
-  isRateLimited,
-  requireVerifiedRole,
-  secureJson,
-  validateMutationOrigin,
-  writeAudit,
-} from "@/lib/api-security";
+import { getUserProfile } from "@/lib/panel-access";
+import { isRateLimited, requireVerifiedRole, secureJson, validateMutationOrigin, writeAudit } from "@/lib/api-security";
 import { createGrantToken, verifyGrantToken } from "@/lib/grant-token";
-import { recordExpiredGrantAudits } from "@/lib/grant-expiry";
 import { fingerprintSensitive } from "@/lib/sensitive-data";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 const allowedMinutes = [15, 30, 60, 120];
-const deviceLabel = (userAgent: string) =>
-  `${/Mobile|Android|iPhone/i.test(userAgent) ? "Mobile" : "Desktop"} · ${/Edg\//.test(userAgent) ? "Edge" : /Chrome\//.test(userAgent) ? "Chrome" : /Safari\//.test(userAgent) ? "Safari" : /Firefox\//.test(userAgent) ? "Firefox" : "Browser"}`;
+const deviceLabel = (userAgent: string) => `${/Mobile|Android|iPhone/i.test(userAgent) ? "Mobile" : "Desktop"} · ${/Edg\//.test(userAgent) ? "Edge" : /Chrome\//.test(userAgent) ? "Chrome" : /Safari\//.test(userAgent) ? "Safari" : /Firefox\//.test(userAgent) ? "Firefox" : "Browser"}`;
 
-type ClientGrantRow = {
-  id: string;
-  agentUserId: string;
-  builderProfileId: string;
-  projectId: string | null;
-  projectName: string;
-  expiresAt: number;
-  createdAt: number;
-  firstOpenedAt: number | null;
-  revokedAt: number | null;
-  openCount: number;
-  agentName: string;
-};
-
-async function clientGrantPayload(
-  rows: ClientGrantRow[],
-  clientUserId: string,
-) {
-  return Promise.all(
-    rows.map(async ({ agentUserId, ...grant }) => ({
-      ...grant,
-      token:
-        !grant.revokedAt && grant.expiresAt > Date.now() && grant.projectId
-          ? await createGrantToken({
-              jti: grant.id,
-              sub: clientUserId,
-              aid: agentUserId,
-              bid: grant.builderProfileId,
-              pid: grant.projectId,
-              exp: Math.floor(grant.expiresAt / 1000),
-            })
-          : undefined,
-    })),
-  );
+async function recordExpired() {
+  const admin = createAdminClient();
+  const now = new Date().toISOString();
+  const { data } = await admin.from("introductions").select("id,agent_id").lt("expires_at", now).is("revoked_at", null).is("expiry_logged_at", null).limit(100);
+  for (const row of data || []) {
+    await admin.from("introductions").update({ expiry_logged_at: now }).eq("id", row.id).is("expiry_logged_at", null);
+    await writeAudit(row.agent_id, "grant.expired", row.id);
+  }
 }
 
 export async function GET(request: Request) {
   const user = await getChatGPTUser();
   if (!user) return secureJson({ error: "Sign in is required." }, 401);
-  const db = getPanelDb();
-  if (!db) return secureJson({ error: "Access grants are unavailable." }, 503);
-  await recordExpiredGrantAudits(db);
-  const admin = isBricklineAdmin(user);
-  const access: {
-    status: string;
-    agent: number | boolean;
-    client: number | boolean;
-    consentVersion?: string;
-    consentWithdrawnAt?: number | null;
-  } | null = admin
-    ? { status: "approved", agent: true, client: true }
-    : (await db
-        .prepare(
-          "SELECT status, agent_access AS agent, client_access AS client, consent_version AS consentVersion, consent_withdrawn_at AS consentWithdrawnAt FROM builder_access_requests WHERE user_id = ?",
-        )
-        .bind(user.userId)
-        .first<{
-          status: string;
-          agent: number;
-          client: number;
-          consentVersion: string;
-          consentWithdrawnAt: number | null;
-        }>()) || null;
-  if (!admin && access?.status !== "approved")
-    return secureJson({ error: "Verified account required." }, 403);
-  if (!admin && (!access?.consentVersion || access.consentWithdrawnAt))
-    return secureJson({ error: "Privacy consent is required." }, 403);
-  const requestedMode = new URL(request.url).searchParams.get("mode");
-  if (requestedMode === "client" && access?.client) {
-    const rows = await db
-      .prepare(
-        "SELECT g.id, g.agent_user_id AS agentUserId, g.builder_profile_id AS builderProfileId, g.project_id AS projectId, COALESCE(p.name, 'Builder profile access') AS projectName, g.expires_at AS expiresAt, g.created_at AS createdAt, g.first_opened_at AS firstOpenedAt, g.revoked_at AS revokedAt, g.open_count AS openCount, COALESCE(a.name, 'Brickline agent') AS agentName FROM client_access_grants g LEFT JOIN builder_access_requests a ON a.user_id = g.agent_user_id LEFT JOIN registered_projects p ON p.id = g.project_id WHERE g.client_user_id = ? ORDER BY g.created_at DESC LIMIT 100",
-      )
-      .bind(user.userId)
-      .all<ClientGrantRow>();
-    return secureJson({
-      mode: "client",
-      grants: await clientGrantPayload(rows.results, user.userId),
-    });
+  const profile = await getUserProfile(user);
+  if (!profile || profile.status !== "approved") return secureJson({ error: "Verified account required." }, 403);
+  await recordExpired();
+  const admin = createAdminClient();
+  const mode = new URL(request.url).searchParams.get("mode");
+  if (mode === "client" || (!profile.agent_access && profile.client_access)) {
+    if (!profile.client_access && !profile.is_admin) return secureJson({ error: "Client access required." }, 403);
+    const { data, error } = await admin.from("introductions").select("*, builders(name), projects(name), profiles!introductions_agent_id_fkey(full_name)").eq("client_id", user.userId).order("created_at", { ascending: false }).limit(100);
+    if (error) return secureJson({ error: "Could not load introductions." }, 503);
+    const grants = await Promise.all((data || []).map(async (row) => {
+      const builder = row.builders as unknown as { name?: string } | null;
+      const project = row.projects as unknown as { name?: string } | null;
+      const agent = row.profiles as unknown as { full_name?: string } | null;
+      const expiresAt = Date.parse(row.expires_at);
+      return {
+        id: row.id, builderProfileId: builder?.name || "Builder profile", projectId: row.project_id, projectName: project?.name || "Builder profile access",
+        expiresAt, createdAt: Date.parse(row.created_at), firstOpenedAt: row.opened_at ? Date.parse(row.opened_at) : null,
+        revokedAt: row.revoked_at ? Date.parse(row.revoked_at) : null, openCount: row.open_count, agentName: agent?.full_name || "Brickline agent",
+        token: !row.revoked_at && expiresAt > Date.now() && row.project_id ? await createGrantToken({ jti: row.id, sub: user.userId, aid: row.agent_id, bid: row.builder_id, pid: row.project_id, exp: Math.floor(expiresAt / 1000) }) : undefined,
+      };
+    }));
+    return secureJson({ mode: "client", grants });
   }
-  if (access?.agent) {
-    const rows = await db
-      .prepare(
-        "SELECT g.id, g.client_email AS clientEmail, g.builder_profile_id AS builderProfileId, g.project_id AS projectId, COALESCE(p.name, 'Builder profile access') AS projectName, g.expires_at AS expiresAt, g.created_at AS createdAt, g.first_opened_at AS firstOpenedAt, g.revoked_at AS revokedAt, g.open_count AS openCount, g.last_opened_at AS lastOpenedAt, g.last_country AS lastCountry, g.device_label AS deviceLabel FROM client_access_grants g LEFT JOIN registered_projects p ON p.id = g.project_id WHERE g.agent_user_id = ? ORDER BY g.created_at DESC LIMIT 100",
-      )
-      .bind(user.userId)
-      .all();
-    return secureJson({ mode: "agent", grants: rows.results });
-  }
-  if (access?.client) {
-    const rows = await db
-      .prepare(
-        "SELECT g.id, g.agent_user_id AS agentUserId, g.builder_profile_id AS builderProfileId, g.project_id AS projectId, COALESCE(p.name, 'Builder profile access') AS projectName, g.expires_at AS expiresAt, g.created_at AS createdAt, g.first_opened_at AS firstOpenedAt, g.revoked_at AS revokedAt, g.open_count AS openCount, COALESCE(a.name, 'Brickline agent') AS agentName FROM client_access_grants g LEFT JOIN builder_access_requests a ON a.user_id = g.agent_user_id LEFT JOIN registered_projects p ON p.id = g.project_id WHERE g.client_user_id = ? ORDER BY g.created_at DESC LIMIT 100",
-      )
-      .bind(user.userId)
-      .all<ClientGrantRow>();
-    return secureJson({
-      mode: "client",
-      grants: await clientGrantPayload(rows.results, user.userId),
-    });
-  }
-  return secureJson({ error: "Agent or Client access required." }, 403);
+  if (!profile.agent_access && !profile.is_admin) return secureJson({ error: "Agent access required." }, 403);
+  const { data, error } = await admin.from("introductions").select("*, builders(name), projects(name), profiles!introductions_client_id_fkey(email)").eq("agent_id", user.userId).order("created_at", { ascending: false }).limit(100);
+  if (error) return secureJson({ error: "Could not load introductions." }, 503);
+  return secureJson({ mode: "agent", grants: (data || []).map((row) => ({
+    id: row.id, clientEmail: (row.profiles as unknown as { email?: string } | null)?.email || "Client",
+    builderProfileId: (row.builders as unknown as { name?: string } | null)?.name || "Builder profile", projectId: row.project_id,
+    projectName: (row.projects as unknown as { name?: string } | null)?.name || "Builder profile access",
+    expiresAt: Date.parse(row.expires_at), createdAt: Date.parse(row.created_at), firstOpenedAt: row.opened_at ? Date.parse(row.opened_at) : null,
+    revokedAt: row.revoked_at ? Date.parse(row.revoked_at) : null, openCount: row.open_count,
+    lastOpenedAt: row.last_opened_at ? Date.parse(row.last_opened_at) : null, lastCountry: row.last_country, deviceLabel: row.device_label,
+  })) });
 }
 
 export async function POST(request: Request) {
@@ -125,115 +63,27 @@ export async function POST(request: Request) {
   if (invalid) return invalid;
   const auth = await requireVerifiedRole("Agent");
   if ("response" in auth) return auth.response;
-  const body = (await request.json().catch(() => null)) as {
-    clientEmail?: unknown;
-    builderProfileId?: unknown;
-    projectId?: unknown;
-    minutes?: unknown;
-  } | null;
-  const clientEmail =
-    typeof body?.clientEmail === "string"
-      ? body.clientEmail.trim().toLowerCase()
-      : "";
-  const builderProfileId =
-    typeof body?.builderProfileId === "string"
-      ? body.builderProfileId.trim()
-      : "";
+  const body = (await request.json().catch(() => null)) as { clientEmail?: unknown; builderProfileId?: unknown; projectId?: unknown; minutes?: unknown } | null;
+  const clientEmail = typeof body?.clientEmail === "string" ? body.clientEmail.trim().toLowerCase() : "";
+  const builderName = typeof body?.builderProfileId === "string" ? body.builderProfileId.trim() : "";
+  const projectId = typeof body?.projectId === "string" ? body.projectId.trim() : "";
   const minutes = Number(body?.minutes);
-  const projectId =
-    typeof body?.projectId === "string" ? body.projectId.trim() : "";
-  if (
-    !/^\S+@\S+\.\S+$/.test(clientEmail) ||
-    !builderProfileId ||
-    builderProfileId.length > 160 ||
-    !allowedMinutes.includes(minutes) ||
-    !projectId
-  )
-    return secureJson(
-      {
-        error: "Choose a verified client, builder, and valid access duration.",
-      },
-      400,
-    );
-  if (
-    await isRateLimited(
-      auth.db,
-      auth.user.userId,
-      "grant.created",
-      60 * 60 * 1000,
-      20,
-    )
-  )
-    return secureJson({ error: "Grant limit reached. Try again later." }, 429);
-  const client = await auth.db
-    .prepare(
-      "SELECT user_id AS userId FROM builder_access_requests WHERE lower(email) = ? AND status = 'approved' AND client_access = 1",
-    )
-    .bind(clientEmail)
-    .first<{ userId: string }>();
-  if (!client)
-    return secureJson(
-      { error: "That client must have an approved Client account first." },
-      404,
-    );
-  const project = await auth.db
-    .prepare(
-      "SELECT id, name FROM registered_projects WHERE id = ? AND builder = ? AND published = 1",
-    )
-    .bind(projectId, builderProfileId)
-    .first<{ id: string; name: string }>();
-  if (!project)
-    return secureJson(
-      { error: "Choose a published project from that builder." },
-      404,
-    );
-  const id = crypto.randomUUID();
-  const createdAt = Date.now();
-  const expiresAt = createdAt + minutes * 60_000;
-  await auth.db
-    .prepare(
-      "INSERT INTO client_access_grants (id, agent_user_id, client_user_id, client_email, builder_profile_id, project_id, expires_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-    )
-    .bind(
-      id,
-      auth.user.userId,
-      client.userId,
-      clientEmail,
-      builderProfileId,
-      projectId,
-      expiresAt,
-      createdAt,
-    )
-    .run();
-  await writeAudit(auth.db, auth.user.userId, "grant.created", id, {
-    clientUserId: client.userId,
-    builderProfileId,
-    projectId,
-    expiresAt,
-  });
-  const token = await createGrantToken({
-    jti: id,
-    sub: client.userId,
-    aid: auth.user.userId,
-    bid: builderProfileId,
-    pid: projectId,
-    exp: Math.floor(expiresAt / 1000),
-  });
-  return secureJson(
-    {
-      grant: {
-        id,
-        clientEmail,
-        builderProfileId,
-        projectId,
-        projectName: project.name,
-        expiresAt,
-        createdAt,
-      },
-      token,
-    },
-    201,
-  );
+  if (!/^\S+@\S+\.\S+$/.test(clientEmail) || !builderName || !projectId || !allowedMinutes.includes(minutes)) return secureJson({ error: "Choose a verified client, builder, and valid access duration." }, 400);
+  if (await isRateLimited(auth.user.userId, "grant.created", 3_600_000, 20)) return secureJson({ error: "Grant limit reached. Try again later." }, 429);
+  const admin = createAdminClient();
+  const { data: client } = await admin.from("profiles").select("id").ilike("email", clientEmail).eq("status", "approved").eq("client_access", true).maybeSingle();
+  if (!client) return secureJson({ error: "That client must have an approved Client account first." }, 404);
+  const { data: builder } = await admin.from("builders").select("id,name").eq("name", builderName).maybeSingle();
+  if (!builder) return secureJson({ error: "Choose a verified builder." }, 404);
+  const { data: project } = await admin.from("projects").select("id,name,builder_id").eq("id", projectId).eq("builder_id", builder.id).eq("published", true).maybeSingle();
+  if (!project) return secureJson({ error: "Choose a published project from that builder." }, 404);
+  const createdAt = new Date();
+  const expiresAt = new Date(createdAt.getTime() + minutes * 60_000);
+  const { data: grant, error } = await admin.from("introductions").insert({ agent_id: auth.user.userId, client_id: client.id, builder_id: builder.id, project_id: project.id, duration_minutes: minutes, created_at: createdAt.toISOString(), expires_at: expiresAt.toISOString() }).select("id").single();
+  if (error || !grant) return secureJson({ error: "Introduction could not be created." }, 503);
+  await writeAudit(auth.user.userId, "grant.created", grant.id, { clientId: client.id, builderId: builder.id, projectId, expiresAt: expiresAt.toISOString() });
+  const token = await createGrantToken({ jti: grant.id, sub: client.id, aid: auth.user.userId, bid: builder.id, pid: project.id, exp: Math.floor(expiresAt.getTime() / 1000) });
+  return secureJson({ grant: { id: grant.id, clientEmail, builderProfileId: builder.name, projectId, projectName: project.name, expiresAt: expiresAt.getTime(), createdAt: createdAt.getTime() }, token }, 201);
 }
 
 export async function PATCH(request: Request) {
@@ -241,174 +91,37 @@ export async function PATCH(request: Request) {
   if (invalid) return invalid;
   const user = await getChatGPTUser();
   if (!user) return secureJson({ error: "Sign in is required." }, 401);
-  const db = getPanelDb();
-  if (!db) return secureJson({ error: "Access grants are unavailable." }, 503);
-  await recordExpiredGrantAudits(db);
-  const body = (await request.json().catch(() => null)) as {
-    action?: unknown;
-    token?: unknown;
-    grantId?: unknown;
-  } | null;
-  if (
-    (body?.action === "open" || body?.action === "validate") &&
-    typeof body.token === "string"
-  ) {
+  const body = (await request.json().catch(() => null)) as { action?: unknown; token?: unknown; grantId?: unknown } | null;
+  const admin = createAdminClient();
+  if ((body?.action === "open" || body?.action === "validate") && typeof body.token === "string") {
     const claims = await verifyGrantToken(body.token);
-    if (!claims)
-      return secureJson(
-        {
-          error: "This secure link is invalid.",
-          code: "invalid",
-        },
-        403,
-      );
-    if (claims.sub !== user.userId)
-      return secureJson(
-        {
-          error: "This introduction belongs to a different client account.",
-          code: "account",
-        },
-        403,
-      );
-    if (claims.exp * 1000 <= Date.now())
-      return secureJson(
-        { error: "This introduction has expired.", code: "expired" },
-        403,
-      );
-    const grant = await db
-      .prepare(
-        "SELECT g.id, g.builder_profile_id AS builderProfileId, g.project_id AS projectId, COALESCE(p.name, 'Builder profile access') AS projectName, g.expires_at AS expiresAt, g.revoked_at AS revokedAt, g.open_count AS openCount, g.bound_device_hash AS boundDeviceHash, g.last_country AS lastCountry, COALESCE(a.name, 'Brickline agent') AS agentName FROM client_access_grants g LEFT JOIN builder_access_requests a ON a.user_id = g.agent_user_id LEFT JOIN registered_projects p ON p.id = g.project_id WHERE g.id = ? AND g.client_user_id = ? AND g.agent_user_id = ?",
-      )
-      .bind(claims.jti, user.userId, claims.aid)
-      .first<{
-        id: string;
-        builderProfileId: string;
-        projectId: string | null;
-        projectName: string;
-        expiresAt: number;
-        revokedAt: number | null;
-        openCount: number;
-        boundDeviceHash: string | null;
-        lastCountry: string | null;
-        agentName: string;
-      }>();
-    if (!grant)
-      return secureJson(
-        { error: "This secure link is invalid.", code: "invalid" },
-        403,
-      );
-    if (grant.revokedAt)
-      return secureJson(
-        {
-          error: "This introduction was revoked by the agent.",
-          code: "revoked",
-        },
-        403,
-      );
-    if (grant.expiresAt <= Date.now())
-      return secureJson(
-        { error: "This introduction has expired.", code: "expired" },
-        403,
-      );
-    if (grant.builderProfileId !== claims.bid || grant.projectId !== claims.pid)
-      return secureJson(
-        {
-          error: "This secure link does not match the shared project.",
-          code: "invalid",
-        },
-        403,
-      );
-    if (body.action === "open" && grant.openCount >= 5) {
-      await writeAudit(db, user.userId, "fraud.grant_open_limit", grant.id);
-      return secureJson(
-        { error: "This secure link has reached its five-open limit." },
-        429,
-      );
-    }
+    if (!claims) return secureJson({ error: "This secure link is invalid.", code: "invalid" }, 403);
+    if (claims.sub !== user.userId) return secureJson({ error: "This introduction belongs to a different client account.", code: "account" }, 403);
+    const { data: grant } = await admin.from("introductions").select("*, builders(name), projects(name), profiles!introductions_agent_id_fkey(full_name)").eq("id", claims.jti).eq("client_id", user.userId).eq("agent_id", claims.aid).maybeSingle();
+    if (!grant || grant.builder_id !== claims.bid || grant.project_id !== claims.pid) return secureJson({ error: "This secure link is invalid.", code: "invalid" }, 403);
+    if (grant.revoked_at) return secureJson({ error: "This introduction was revoked by the agent.", code: "revoked" }, 403);
+    if (Date.parse(grant.expires_at) <= Date.now() || claims.exp * 1000 <= Date.now()) return secureJson({ error: "This introduction has expired.", code: "expired" }, 403);
+    if (body.action === "open" && grant.open_count >= 5) return secureJson({ error: "This secure link has reached its five-open limit." }, 429);
     const userAgent = request.headers.get("user-agent") || "unknown-browser";
-    const language =
-      request.headers.get("accept-language") || "unknown-language";
+    const language = request.headers.get("accept-language") || "unknown-language";
     const deviceHash = await fingerprintSensitive(`${userAgent}|${language}`);
-    const country =
-      (request.headers.get("cf-ipcountry") || "").slice(0, 2).toUpperCase() ||
-      null;
-    if (grant.boundDeviceHash && grant.boundDeviceHash !== deviceHash) {
-      await writeAudit(
-        db,
-        user.userId,
-        "fraud.grant_device_mismatch",
-        grant.id,
-      );
-      return secureJson(
-        {
-          error:
-            "This link is bound to another device. Ask the agent for a new link.",
-        },
-        403,
-      );
-    }
-    if (grant.lastCountry && country && grant.lastCountry !== country) {
-      await writeAudit(
-        db,
-        user.userId,
-        "fraud.grant_location_change",
-        grant.id,
-        { previousCountry: grant.lastCountry, country },
-      );
-      return secureJson(
-        {
-          error:
-            "Location changed. Re-verification is required through your agent.",
-        },
-        403,
-      );
-    }
+    const country = (request.headers.get("cf-ipcountry") || request.headers.get("x-vercel-ip-country") || "").slice(0, 2).toUpperCase() || null;
+    if (grant.bound_device_hash && grant.bound_device_hash !== deviceHash) return secureJson({ error: "This link is bound to another device. Ask the agent for a new link." }, 403);
+    if (grant.last_country && country && grant.last_country !== country) return secureJson({ error: "Location changed. Re-verification is required through your agent." }, 403);
     if (body.action === "open") {
-      const openedAt = Date.now();
-      await db
-        .prepare(
-          "UPDATE client_access_grants SET first_opened_at = COALESCE(first_opened_at, ?), last_opened_at = ?, open_count = open_count + 1, bound_device_hash = COALESCE(bound_device_hash, ?), last_country = COALESCE(?, last_country), device_label = COALESCE(device_label, ?) WHERE id = ? AND open_count < 5",
-        )
-        .bind(
-          openedAt,
-          openedAt,
-          deviceHash,
-          country,
-          deviceLabel(userAgent),
-          grant.id,
-        )
-        .run();
-      await writeAudit(db, user.userId, "grant.opened", grant.id, {
-        builderProfileId: grant.builderProfileId,
-        projectId: grant.projectId,
-        openNumber: grant.openCount + 1,
-        country,
-      });
+      const openedAt = new Date().toISOString();
+      await admin.from("introductions").update({ opened_at: grant.opened_at || openedAt, last_opened_at: openedAt, open_count: grant.open_count + 1, bound_device_hash: grant.bound_device_hash || deviceHash, last_country: grant.last_country || country, device_label: grant.device_label || deviceLabel(userAgent) }).eq("id", grant.id).lt("open_count", 5);
+      await writeAudit(user.userId, "grant.opened", grant.id, { projectId: grant.project_id, openNumber: grant.open_count + 1, country });
     }
-    return secureJson({
-      grant: {
-        id: grant.id,
-        builderProfileId: grant.builderProfileId,
-        projectId: grant.projectId,
-        projectName: grant.projectName,
-        expiresAt: grant.expiresAt,
-        openCount: grant.openCount + (body.action === "open" ? 1 : 0),
-        agentName: grant.agentName,
-      },
-    });
+    return secureJson({ grant: { id: grant.id, builderProfileId: (grant.builders as unknown as { name?: string } | null)?.name || "Builder profile", projectId: grant.project_id, projectName: (grant.projects as unknown as { name?: string } | null)?.name || "Builder profile access", expiresAt: Date.parse(grant.expires_at), openCount: grant.open_count + (body.action === "open" ? 1 : 0), agentName: (grant.profiles as unknown as { full_name?: string } | null)?.full_name || "Brickline agent" } });
   }
   if (body?.action === "revoke" && typeof body.grantId === "string") {
     const auth = await requireVerifiedRole("Agent");
     if ("response" in auth) return auth.response;
-    const result = await auth.db
-      .prepare(
-        "UPDATE client_access_grants SET revoked_at = ? WHERE id = ? AND agent_user_id = ? AND revoked_at IS NULL AND expires_at > ?",
-      )
-      .bind(Date.now(), body.grantId, auth.user.userId, Date.now())
-      .run();
-    if (!result.meta.changes)
-      return secureJson({ error: "Active grant not found." }, 404);
-    await writeAudit(auth.db, auth.user.userId, "grant.revoked", body.grantId);
+    const now = new Date().toISOString();
+    const { data } = await admin.from("introductions").update({ revoked_at: now }).eq("id", body.grantId).eq("agent_id", auth.user.userId).is("revoked_at", null).gt("expires_at", now).select("id").maybeSingle();
+    if (!data) return secureJson({ error: "Active grant not found." }, 404);
+    await writeAudit(auth.user.userId, "grant.revoked", body.grantId);
     return secureJson({ status: "revoked" });
   }
   return secureJson({ error: "Invalid grant action." }, 400);

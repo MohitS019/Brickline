@@ -3,8 +3,5 @@
   "framework": "nextjs",
   "installCommand": "npm ci",
   "buildCommand": "npm run build:vercel",
-  "devCommand": "npm run dev:vercel",
-  "env": {
-    "NEXT_PUBLIC_BRICKLINE_APP_URL": "https://brickline-b2b-platform.msonje.chatgpt.site"
-  }
+  "devCommand": "npm run dev:vercel"
 }

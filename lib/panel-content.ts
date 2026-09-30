@@ -1,5 +1,6 @@
-import { getPanelDb } from "@/lib/panel-access";
 import type { Role } from "@/lib/brickline-data";
+import { getSupabasePublicConfig } from "@/lib/supabase/config";
+import { createClient } from "@/lib/supabase/server";
 
 export type PanelCopy = { headline: string; accent: string; description: string };
 export type PanelContent = Record<Role, PanelCopy>;
@@ -12,11 +13,11 @@ export const defaultPanelContent: PanelContent = {
 
 export async function getPanelContent(): Promise<PanelContent> {
   const content: PanelContent = { ...defaultPanelContent };
-  const db = getPanelDb();
-  if (!db) return content;
+  if (!getSupabasePublicConfig()) return content;
   try {
-    const rows = await db.prepare("SELECT role, headline, accent, description FROM panel_content").all<PanelCopy & { role: Role }>();
-    for (const row of rows.results) if (row.role in content) content[row.role] = { headline: row.headline, accent: row.accent, description: row.description };
+    const supabase = await createClient();
+    const { data } = await supabase.from("panel_content").select("role,headline,accent,description");
+    for (const row of data || []) if (row.role in content) content[row.role as Role] = { headline: row.headline, accent: row.accent, description: row.description };
   } catch { /* Keep default copy while a migration or database is unavailable. */ }
   return content;
 }

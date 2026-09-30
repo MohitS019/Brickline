@@ -1,97 +1,33 @@
-import { getChatGPTUser } from "@/app/chatgpt-auth";
-import { getPanelDb, isBricklineAdmin } from "@/lib/panel-access";
-import {
-  requireVerifiedRole,
-  secureJson,
-  validateMutationOrigin,
-  writeAudit,
-} from "@/lib/api-security";
 import type { ProjectStatus } from "@/lib/brickline-data";
-import { ensureDemoData } from "@/lib/demo-seed";
+import { requireAdmin, secureJson, validateMutationOrigin, writeAudit } from "@/lib/api-security";
+import { mapAreaSignal } from "@/lib/supabase/mappers";
+import { createClient } from "@/lib/supabase/server";
 
-const categories: ProjectStatus[] = [
-  "New construction",
-  "Redevelopment",
-  "Approval stage",
-  "Construction started",
-];
+const categories: ProjectStatus[] = ["New construction", "Redevelopment", "Approval stage", "Construction started"];
 
 export async function GET() {
-  const auth = await requireVerifiedRole("Agent");
-  if ("response" in auth) return auth.response;
-  await ensureDemoData(auth.db);
-  const rows = await auth.db
-    .prepare(
-      "SELECT id,title,area,state,category,detail,source_note AS sourceNote,event_date AS eventDate,created_at AS createdAt,is_demo AS isDemo FROM area_signals ORDER BY event_date DESC, created_at DESC LIMIT 300",
-    )
-    .all();
-  return secureJson({ signals: rows.results });
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase.from("area_signals").select("*").order("event_date", { ascending: false }).limit(300);
+    if (error) throw error;
+    return secureJson({ signals: (data || []).map(mapAreaSignal) });
+  } catch {
+    return secureJson({ signals: [] });
+  }
 }
 
 export async function POST(request: Request) {
   const invalid = validateMutationOrigin(request);
   if (invalid) return invalid;
-  const user = await getChatGPTUser();
-  if (!user || !isBricklineAdmin(user))
-    return secureJson({ error: "Admin permission is required." }, 403);
-  const db = getPanelDb();
-  if (!db) return secureJson({ error: "Signal storage is unavailable." }, 503);
-  const body = (await request.json().catch(() => null)) as Record<
-    string,
-    unknown
-  > | null;
-  const field = (key: string, max: number) =>
-    typeof body?.[key] === "string"
-      ? String(body[key]).trim().slice(0, max)
-      : "";
-  const signal = {
-    title: field("title", 160),
-    area: field("area", 120),
-    state: field("state", 120),
-    category: field("category", 40) as ProjectStatus,
-    detail: field("detail", 1500),
-    sourceNote: field("sourceNote", 300),
-    eventDate: field("eventDate", 10),
-  };
-  if (
-    !signal.title ||
-    !signal.area ||
-    !signal.state ||
-    !categories.includes(signal.category) ||
-    !signal.detail ||
-    !signal.sourceNote ||
-    !/^\d{4}-\d{2}-\d{2}$/.test(signal.eventDate)
-  )
-    return secureJson(
-      {
-        error:
-          "Complete every signal field with a valid India location, category, source, and date.",
-      },
-      400,
-    );
-  const id = crypto.randomUUID();
-  const createdAt = Date.now();
-  await db
-    .prepare(
-      "INSERT INTO area_signals (id,title,area,state,category,detail,source_note,event_date,created_at,created_by) VALUES (?,?,?,?,?,?,?,?,?,?)",
-    )
-    .bind(
-      id,
-      signal.title,
-      signal.area,
-      signal.state,
-      signal.category,
-      signal.detail,
-      signal.sourceNote,
-      signal.eventDate,
-      createdAt,
-      user.userId,
-    )
-    .run();
-  await writeAudit(db, user.userId, "signal.published", id, {
-    area: signal.area,
-    state: signal.state,
-    category: signal.category,
-  });
-  return secureJson({ signal: { id, ...signal, createdAt } }, 201);
+  const auth = await requireAdmin();
+  if ("response" in auth) return auth.response;
+  const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
+  const field = (key: string, max: number) => typeof body?.[key] === "string" ? String(body[key]).trim().slice(0, max) : "";
+  const signal = { title: field("title", 160), area: field("area", 120), state: field("state", 120), category: field("category", 40) as ProjectStatus, detail: field("detail", 1500), sourceNote: field("sourceNote", 300), eventDate: field("eventDate", 10) };
+  if (!signal.title || !signal.area || !signal.state || !categories.includes(signal.category) || !signal.detail || !signal.sourceNote || !/^\d{4}-\d{2}-\d{2}$/.test(signal.eventDate)) return secureJson({ error: "Complete every signal field with a valid India location, category, source, and date." }, 400);
+  const [locality, ...cityParts] = signal.area.split(",").map((part) => part.trim());
+  const { data, error } = await auth.admin.from("area_signals").insert({ title: signal.title, description: signal.detail, status_tag: signal.category, locality, city: cityParts.join(", ") || locality, state: signal.state, source_label: signal.sourceNote, event_date: signal.eventDate }).select("*").single();
+  if (error || !data) return secureJson({ error: "Signal could not be published." }, 503);
+  await writeAudit(auth.user.userId, "signal.published", data.id, { area: signal.area, state: signal.state, category: signal.category });
+  return secureJson({ signal: mapAreaSignal(data) }, 201);
 }

@@ -1,7 +1,6 @@
-import { env } from "cloudflare:workers";
-
+import "server-only";
 const encoder = new TextEncoder(); const decoder = new TextDecoder();
-const secret = () => (env as { BRICKLINE_DATA_SECRET?: string }).BRICKLINE_DATA_SECRET || "";
+const secret = () => process.env.BRICKLINE_DATA_SECRET || "";
 async function key() { return crypto.subtle.importKey("raw", await crypto.subtle.digest("SHA-256", encoder.encode(secret())), "AES-GCM", false, ["encrypt", "decrypt"]); }
 const pack = (bytes: Uint8Array) => btoa(String.fromCharCode(...bytes));
 const unpack = (value: string) => Uint8Array.from(atob(value), character => character.charCodeAt(0));

@@ -24,6 +24,7 @@ next-env.d.ts
 
 # Vercel local project state
 /.vercel/
+/supabase/.temp/
 
 # Tests and reports
 /coverage/

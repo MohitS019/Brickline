@@ -41,27 +41,19 @@ role-aware workspace.
 | Layer                | Choice                                                 |
 | -------------------- | ------------------------------------------------------ |
 | UI                   | React 19, Next.js 16 App Router, TypeScript            |
-| Primary runtime      | Vinext/Vite on Cloudflare Workers through OpenAI Sites |
+| Primary runtime      | Next.js on Vercel                                      |
 | Maps                 | MapLibre GL with OpenStreetMap tiles                   |
-| Data                 | Cloudflare D1 with Drizzle migrations                  |
+| Auth and data        | Supabase Auth + Postgres with Row Level Security       |
 | Styling              | Tailwind CSS plus Brickline's custom design system     |
 | Icons                | Lucide React                                           |
-| Secondary deployment | Vercel-compatible public Next.js build                 |
+| Portable build       | Vinext/Vite compatibility build                        |
 
 ## Deployment model
 
-Brickline has two deliberate deployment targets:
-
-1. **OpenAI Sites is the full application.** It provides dispatch-owned ChatGPT
-   sign-in, Cloudflare D1 bindings, and the authenticated Agent, Builder, Client,
-   and Admin workspaces.
-2. **Vercel is a public web target.** It builds the same public landing and legal
-   pages with standard Next.js. Protected actions are forwarded to the full
-   Sites application configured by `NEXT_PUBLIC_BRICKLINE_APP_URL`.
-
-The Vercel compatibility layer intentionally does not fake a database or
-authentication session. This keeps public deployments honest and prevents a
-partially secured duplicate backend.
+Brickline uses Supabase as the shared authentication and data layer. The full
+public site and the authenticated Agent, Builder, Client, and Admin workspaces
+can therefore run as one Next.js application on Vercel. A portable Vinext build
+remains available for compatibility testing.
 
 ## Prerequisites
 
@@ -91,20 +83,14 @@ Copy-Item .env.example .env.local
 
 Never commit `.env.local` or real secrets.
 
-### Run the full Sites-compatible application
+### Run the application
 
 ```bash
 npm run dev
 ```
 
-The portable preview runs on `http://127.0.0.1:5173`. Local Sites development
-can simulate sign-in through:
-
-```text
-/signin-with-chatgpt?return_to=/
-```
-
-Build and preview the Cloudflare Worker output:
+The portable preview runs on `http://127.0.0.1:5173`. Build and preview its
+Worker output with:
 
 ```bash
 npm run build
@@ -119,20 +105,31 @@ npm run build:vercel
 npm run start:vercel
 ```
 
-The Vercel target renders public pages locally. Protected links use
-`NEXT_PUBLIC_BRICKLINE_APP_URL` and return visitors to the full application.
+The Next.js target includes public pages, Supabase login/sign-up, and every
+role-aware workspace.
 
 ## Environment variables
 
-| Variable                        | Required by | Purpose                                      |
-| ------------------------------- | ----------- | -------------------------------------------- |
-| `NEXT_PUBLIC_BRICKLINE_APP_URL` | Vercel      | Full application origin for protected routes |
-| `BRICKLINE_ADMIN_EMAIL`         | Sites       | Comma-separated administrator allowlist      |
-| `BRICKLINE_GRANT_SECRET`        | Sites       | HMAC signing secret for timed introductions  |
-| `BRICKLINE_DATA_SECRET`         | Sites       | Encryption and fingerprinting secret         |
+| Variable                            | Exposure    | Purpose                                      |
+| ----------------------------------- | ----------- | -------------------------------------------- |
+| `NEXT_PUBLIC_SUPABASE_URL`          | Browser     | Supabase project URL                         |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY`     | Browser     | Publishable/anon key governed by RLS         |
+| `SUPABASE_SERVICE_ROLE_KEY`         | Server only | Admin operations; never expose to the client |
+| `BRICKLINE_GRANT_SECRET`            | Server only | HMAC signing secret for timed introductions  |
+| `BRICKLINE_DATA_SECRET`             | Server only | Device-binding fingerprint secret            |
 
-The `DB` D1 binding is declared in `.openai/hosting.json` and injected by Sites;
-it is not stored in an environment file.
+The protected Admin workspace is available at `/admin`. The database migration
+promotes only the verified Supabase account `mohitsonje4@gmail.com`; all other
+accounts are rejected by the server-side route and Admin API checks.
+
+For a different first administrator, update the chosen row directly in Supabase:
+
+```sql
+update public.profiles
+set is_admin = true, status = 'approved',
+    agent_access = true, builder_access = true, client_access = true
+where email = 'admin@example.com';
+```
 
 ## Scripts
 
@@ -140,29 +137,33 @@ it is not stored in an environment file.
 | ---------------------- | ------------------------------------------------ |
 | `npm run dev`          | Start the Vinext/Sites development server        |
 | `npm run build`        | Build the deployable Cloudflare Worker           |
-| `npm start`            | Preview the built Worker with local D1 state     |
+| `npm start`            | Preview the portable Worker build                |
 | `npm run dev:vercel`   | Start standard Next.js development               |
 | `npm run build:vercel` | Verify the Vercel production build               |
 | `npm run start:vercel` | Serve the completed Next.js build                |
 | `npm run typecheck`    | Run strict TypeScript checks                     |
 | `npm run lint`         | Run ESLint                                       |
-| `npm run db:generate`  | Generate Drizzle migrations after schema changes |
+| `npx supabase start`   | Start the local Supabase stack                   |
+| `npx supabase test db` | Run database and RLS tests                       |
 
 ## Database and demo data
 
-The D1 schema is defined by ordered SQL migrations in `drizzle/`. Do not edit an
-already deployed migration; add a new migration instead.
+The Postgres schema, explicit grants, RLS policies, auth profile trigger, and
+labelled demo records live in `supabase/migrations/`. Create future migrations
+with `npx supabase migration new <name>` and never edit a migration already
+applied to production.
 
-`lib/demo-seed.ts` provides the shared, labelled demo dataset used by the map,
-project lists, builder cards, area intelligence, and Admin examples. Production
-records retain their own verification state and are never silently converted
-into demo records.
+The initial migration seeds 10 labelled demo projects, 5 builders, and 4 area
+signals. All product screens read these rows through Supabase; production rows
+use `is_demo_record = false` and never receive the Demo record label.
 
 ## Project structure
 
 ```text
 app/
   api/                       secured route handlers
+  auth/                      Supabase callback and sign-out routes
+  login/                     email/password login and sign-up
   projects/[projectId]/      full project research route
   request-access/            role-based registration
   privacy|terms|data-sources public policy pages
@@ -172,11 +173,11 @@ components/brickline/
   interactive-project-map.tsx
 lib/
   api-security.ts            authorization, rate limits, audit helpers
-  demo-seed.ts               shared illustrative dataset
   grant-token.ts             signed timed-access tokens
-  sensitive-data.ts          encryption and fingerprints
-  platform/                  deployment compatibility adapters
-drizzle/                     ordered D1 migrations
+  supabase/                  browser/server/admin clients and mappers
+supabase/
+  migrations/                Postgres schema, seed data, grants, and RLS
+  tests/                     pgTAP security tests
 public/                      logos, favicon, and static headers
 scripts/                     Sites/Vinext build and preview helpers
 ```
@@ -187,8 +188,10 @@ scripts/                     Sites/Vinext build and preview helpers
 - Sensitive mutations require verified server-side roles and same-origin JSON.
 - Introduction expiry and revocation are checked by the server, not only by a
   browser countdown.
-- RERA/GST values are encrypted before storage and fingerprinted for duplicate
-  detection.
+- The service-role key is imported only by server route helpers and is never
+  referenced by a Client Component.
+- Profile, project, introduction, and signal access is protected by explicit
+  Postgres grants plus RLS policies.
 - Secrets belong in the hosting provider's encrypted environment settings.
 - Demo data is always labelled in the interface.
 
@@ -199,19 +202,16 @@ for user-facing details.
 
 ## Deploying
 
-### OpenAI Sites
-
-Use the Sites workflow so the source commit, Cloudflare build archive, D1
-migrations, and deployment remain synchronized. Runtime secrets are configured
-in Sites rather than committed to this repository.
-
 ### Vercel
 
 1. Import this GitHub repository into Vercel.
 2. Keep the framework preset as **Next.js**.
 3. The committed `vercel.json` runs `npm ci` and `npm run build:vercel`.
-4. Confirm `NEXT_PUBLIC_BRICKLINE_APP_URL` points at the full Sites application.
-5. Deploy. Pull requests receive preview deployments through Vercel's normal Git
+4. Add all five environment variables from `.env.example`; keep
+   `SUPABASE_SERVICE_ROLE_KEY`, `BRICKLINE_GRANT_SECRET`, and
+   `BRICKLINE_DATA_SECRET` restricted to the server.
+5. Apply the Supabase migrations, configure the Auth Site URL and redirect URLs,
+   then deploy. Pull requests receive preview deployments through Vercel's normal Git
    integration.
 
 ## Contributing

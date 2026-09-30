@@ -1,20 +1,21 @@
 import WorkspaceApp from "@/components/brickline/workspace-app";
 import { PublicLanding } from "@/components/brickline/public-landing";
 import { getChatGPTUser, chatGPTSignInPath } from "@/app/chatgpt-auth";
-import { demoPublicProjects } from "@/lib/demo-seed";
 import { getPanelAccess } from "@/lib/panel-access";
 import { getPanelContent } from "@/lib/panel-content";
 import { getExternalAppUrl } from "@/lib/platform/runtime";
+import { getPublicProjects } from "@/lib/supabase/queries";
 
 export const dynamic = "force-dynamic";
 export default async function Home() {
   const user = await getChatGPTUser();
   if (!user) {
+    const projects = await getPublicProjects();
     const externalAppUrl = getExternalAppUrl();
     const signInPath = chatGPTSignInPath("/");
     return (
       <PublicLanding
-        projects={demoPublicProjects}
+        projects={projects}
         appUrl={externalAppUrl}
         signInHref={
           externalAppUrl ? `${externalAppUrl}${signInPath}` : signInPath

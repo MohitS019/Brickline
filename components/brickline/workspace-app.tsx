@@ -40,13 +40,15 @@ export default function WorkspaceApp({
   panelAccess,
   panelContent: initialPanelContent,
   initialProjectId = null,
+  initialView = "overview",
 }: {
   panelAccess: PanelAccess;
   panelContent: PanelContent;
   initialProjectId?: string | null;
+  initialView?: ViewId;
 }) {
   const [panelContent, setPanelContent] = useState(initialPanelContent);
-  const [view, setView] = useState<ViewId>("overview");
+  const [view, setView] = useState<ViewId>(initialView);
   const [role, setRole] = useState<Role>(
     panelAccess.allowedRoles[0] || "Agent",
   );
@@ -176,6 +178,11 @@ export default function WorkspaceApp({
 
   const navigate = (next: ViewId) => {
     if (next === "admin" && !panelAccess.isAdmin) return;
+    if (next === "admin" && window.location.pathname !== "/admin") {
+      window.history.pushState({ bricklineView: next }, "", "/admin");
+    } else if (next !== "admin" && window.location.pathname === "/admin") {
+      window.history.pushState({ bricklineView: next }, "", "/");
+    }
     if (projectId) {
       window.history.replaceState(
         { bricklineView: next, bricklineScroll: 0 },

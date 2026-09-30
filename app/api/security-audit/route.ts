@@ -1,41 +1,15 @@
-import { getChatGPTUser } from "@/app/chatgpt-auth";
-import { getPanelDb, isBricklineAdmin } from "@/lib/panel-access";
-import { secureJson } from "@/lib/api-security";
-import { recordExpiredGrantAudits } from "@/lib/grant-expiry";
+import { requireAdmin, secureJson } from "@/lib/api-security";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const user = await getChatGPTUser();
-  if (!user) return secureJson({ error: "Sign in is required." }, 401);
-  if (!isBricklineAdmin(user))
-    return secureJson({ error: "Admin permission is required." }, 403);
-  const db = getPanelDb();
-  if (!db) return secureJson({ error: "Audit service is unavailable." }, 503);
-  try {
-    await recordExpiredGrantAudits(db);
-    const events = await db
-      .prepare(
-        "SELECT l.id, l.actor_user_id AS actorUserId, COALESCE(r.email, l.actor_user_id) AS actor, l.event_type AS eventType, l.target_id AS targetId, l.metadata, l.created_at AS createdAt FROM security_audit_log l LEFT JOIN builder_access_requests r ON r.user_id = l.actor_user_id ORDER BY l.created_at DESC LIMIT 200",
-      )
-      .all();
-    const unusual = await db
-      .prepare(
-        "SELECT l.actor_user_id AS actorUserId, COALESCE(r.email, l.actor_user_id) AS actor, COUNT(*) AS count FROM security_audit_log l LEFT JOIN builder_access_requests r ON r.user_id = l.actor_user_id WHERE l.event_type = 'grant.created' AND l.created_at >= ? GROUP BY l.actor_user_id HAVING COUNT(*) >= 10 ORDER BY count DESC",
-      )
-      .bind(Date.now() - 60 * 60 * 1000)
-      .all();
-    const fraud = await db
-      .prepare(
-        "SELECT l.id, COALESCE(r.email, l.actor_user_id) AS actor, l.event_type AS eventType, l.target_id AS targetId, l.created_at AS createdAt FROM security_audit_log l LEFT JOIN builder_access_requests r ON r.user_id = l.actor_user_id WHERE l.event_type LIKE 'fraud.%' ORDER BY l.created_at DESC LIMIT 50",
-      )
-      .all();
-    return secureJson({
-      events: events.results,
-      alerts: unusual.results,
-      fraudAlerts: fraud.results,
-    });
-  } catch {
-    return secureJson({ error: "Audit activity could not be loaded." }, 503);
-  }
+  const auth = await requireAdmin();
+  if ("response" in auth) return auth.response;
+  const { data, error } = await auth.admin.from("audit_events").select("*, profiles(email)").order("created_at", { ascending: false }).limit(200);
+  if (error) return secureJson({ error: "Audit activity could not be loaded." }, 503);
+  const events = (data || []).map((row) => ({ id: row.id, actorUserId: row.actor_id, actor: (row.profiles as unknown as { email?: string } | null)?.email || row.actor_id || "System", eventType: row.event_type, targetId: row.target_id, metadata: JSON.stringify(row.metadata || {}), createdAt: Date.parse(row.created_at) }));
+  const recent = events.filter((row) => row.eventType === "grant.created" && row.createdAt >= Date.now() - 3_600_000);
+  const counts = new Map<string, { actorUserId: string; actor: string; count: number }>();
+  recent.forEach((row) => { const key = row.actorUserId || "system"; const current = counts.get(key) || { actorUserId: key, actor: row.actor, count: 0 }; current.count += 1; counts.set(key, current); });
+  return secureJson({ events, alerts: [...counts.values()].filter((item) => item.count >= 10), fraudAlerts: events.filter((row) => row.eventType.startsWith("fraud.")).slice(0, 50) });
 }
