@@ -6,7 +6,7 @@ area intelligence, project timelines, and secure timed introductions in one
 role-aware workspace.
 
 **Live application:**
-[brickline-b2b-platform.msonje.chatgpt.site](https://brickline-b2b-platform.msonje.chatgpt.site)
+[bricklinereal.vercel.app](https://bricklinereal.vercel.app)
 
 > The repository includes clearly labelled illustrative demo records. They are
 > product samples, not live market claims.
@@ -89,33 +89,37 @@ Never commit `.env.local` or real secrets.
 npm run dev
 ```
 
-The portable preview runs on `http://127.0.0.1:5173`. Build and preview its
-Worker output with:
+The Next.js application runs on `http://localhost:3000`. Build and serve the
+production application with:
 
 ```bash
 npm run build
 npm start
 ```
 
-### Run the Vercel/Next.js target
+### Optional Sites compatibility target
 
 ```bash
-npm run dev:vercel
-npm run build:vercel
-npm run start:vercel
+npm run dev:sites
+npm run build:sites
+npm run start:sites
 ```
 
-The Next.js target includes public pages, Supabase login/sign-up, and every
-role-aware workspace.
+Sites/Vinext support is isolated under `scripts/sites/`; it is not used by the
+Vercel production deployment.
 
 ## Environment variables
 
-| Variable                            | Exposure    | Purpose                                      |
-| ----------------------------------- | ----------- | -------------------------------------------- |
+| Variable                               | Exposure    | Purpose                                      |
+| -------------------------------------- | ----------- | -------------------------------------------- |
 | `NEXT_PUBLIC_SUPABASE_URL`             | Browser     | Supabase project URL                          |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Browser     | `sb_publishable_…` key governed by RLS        |
 | `SUPABASE_SECRET_KEY`                  | Server only | `sb_secret_…` key; never expose to the client |
 | `BRICKLINE_APP_SECRET`                 | Server only | 32+ random bytes used for derived app keys    |
+
+Use the raw Supabase project URL, for example
+`https://your-project-ref.supabase.co`. Do not paste Markdown such as
+`[https://…](https://…)` into `.env.local` or Vercel.
 
 `BRICKLINE_ADMIN_EMAIL` is optional and defaults to `mohitsonje4@gmail.com`.
 Account passwords are not environment variables: Supabase Auth salts and hashes
@@ -142,18 +146,17 @@ where email = 'admin@example.com';
 
 ## Scripts
 
-| Command                | Purpose                                          |
-| ---------------------- | ------------------------------------------------ |
-| `npm run dev`          | Start the Vinext/Sites development server        |
-| `npm run build`        | Build the deployable Cloudflare Worker           |
-| `npm start`            | Preview the portable Worker build                |
-| `npm run dev:vercel`   | Start standard Next.js development               |
-| `npm run build:vercel` | Verify the Vercel production build               |
-| `npm run start:vercel` | Serve the completed Next.js build                |
-| `npm run typecheck`    | Run strict TypeScript checks                     |
-| `npm run lint`         | Run ESLint                                       |
-| `npx supabase start`   | Start the local Supabase stack                   |
-| `npx supabase test db` | Run database and RLS tests                       |
+| Command                | Purpose                                 |
+| ---------------------- | --------------------------------------- |
+| `npm run dev`          | Start standard Next.js development      |
+| `npm run build`        | Build the Vercel/Next.js application    |
+| `npm start`            | Serve the completed Next.js build       |
+| `npm run dev:sites`    | Start the optional Sites/Vinext preview |
+| `npm run build:sites`  | Build the optional portable Worker      |
+| `npm run typecheck`    | Run strict TypeScript checks            |
+| `npm run lint`         | Run ESLint                              |
+| `npx supabase start`   | Start the local Supabase stack          |
+| `npx supabase test db` | Run database and RLS tests              |
 
 ## Database and demo data
 
@@ -188,7 +191,8 @@ supabase/
   migrations/                Postgres schema, seed data, grants, and RLS
   tests/                     pgTAP security tests
 public/                      logos, favicon, and static headers
-scripts/                     Sites/Vinext build and preview helpers
+scripts/                     build helpers
+  sites/                     isolated Sites/Vinext compatibility tooling
 ```
 
 ## Security notes
@@ -197,16 +201,16 @@ scripts/                     Sites/Vinext build and preview helpers
 - Sensitive mutations require verified server-side roles and same-origin JSON.
 - Introduction expiry and revocation are checked by the server, not only by a
   browser countdown.
-- The service-role key is imported only by server route helpers and is never
+- The Supabase secret key is imported only by server route helpers and is never
   referenced by a Client Component.
 - Profile, project, introduction, and signal access is protected by explicit
   Postgres grants plus RLS policies.
 - Secrets belong in the hosting provider's encrypted environment settings.
 - Demo data is always labelled in the interface.
 
-See the public [Privacy Notice](https://brickline-b2b-platform.msonje.chatgpt.site/privacy),
-[Terms](https://brickline-b2b-platform.msonje.chatgpt.site/terms), and
-[Data Sources](https://brickline-b2b-platform.msonje.chatgpt.site/data-sources)
+See the public [Privacy Notice](https://bricklinereal.vercel.app/privacy),
+[Terms](https://bricklinereal.vercel.app/terms), and
+[Data Sources](https://bricklinereal.vercel.app/data-sources)
 for user-facing details.
 
 ## Deploying
@@ -215,7 +219,7 @@ for user-facing details.
 
 1. Import this GitHub repository into Vercel.
 2. Keep the framework preset as **Next.js**.
-3. The committed `vercel.json` runs `npm ci` and `npm run build:vercel`.
+3. Use the framework defaults: `npm ci` followed by `npm run build`.
 4. Add the four environment variables from `.env.example`; keep
    `SUPABASE_SECRET_KEY` and `BRICKLINE_APP_SECRET` restricted to the server.
 5. Apply the Supabase migrations, configure the Auth Site URL and redirect URLs,
@@ -226,8 +230,7 @@ for user-facing details.
 
 1. Create a focused branch.
 2. Keep demo records labelled and migrations append-only.
-3. Run `npm run typecheck`, `npm run lint`, `npm run build`, and
-   `npm run build:vercel`.
+3. Run `npm run typecheck`, `npm run lint`, and `npm run build`.
 4. Open a pull request describing user-visible behavior and security impact.
 
 ## License

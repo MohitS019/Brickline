@@ -14,6 +14,9 @@
 /dist/
 /out/
 /build-output/
+/.cache/
+/.turbo/
+/tmp/
 /public/maplibre/
 *.tsbuildinfo
 next-env.d.ts
@@ -34,6 +37,7 @@ next-env.d.ts
 # Local environment files and secrets
 .env*
 !.env.example
+*.local
 *.pem
 
 # Logs
@@ -45,7 +49,9 @@ yarn-error.log*
 
 # Editor and operating-system files
 .DS_Store
+Desktop.ini
 Thumbs.db
+ehthumbs.db
 .idea/
 .vscode/*
 !.vscode/extensions.json
@@ -56,4 +62,8 @@ Thumbs.db
 /.codex/
 /outputs/
 /work/
+/artifacts/
+/screenshots/
+*.tgz
+*.zip
 *.tar.gz
