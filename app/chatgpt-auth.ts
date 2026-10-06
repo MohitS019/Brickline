@@ -35,7 +35,7 @@ export function chatGPTSignInPath(returnTo: string) {
 export function chatGPTSignOutPath(returnTo = "/") {
   return `/auth/signout?returnTo=${encodeURIComponent(safeRelativeReturnPath(returnTo))}`;
 }
-function safeRelativeReturnPath(value: string) {
+export function safeRelativeReturnPath(value: string) {
   if (!value.startsWith("/") || value.startsWith("//")) return "/";
   try {
     const url = new URL(value, "https://app.local");

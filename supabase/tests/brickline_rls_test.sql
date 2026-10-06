@@ -1,5 +1,5 @@
 begin;
-select plan(27);
+select plan(32);
 
 select ok((select relrowsecurity from pg_class where oid = 'public.profiles'::regclass), 'profiles RLS enabled');
 select ok((select relrowsecurity from pg_class where oid = 'public.builders'::regclass), 'builders RLS enabled');
@@ -32,6 +32,12 @@ select ok(not has_table_privilege('authenticated', 'public.audit_events', 'inser
 select ok(not has_function_privilege('anon', 'private.promote_brickline_admin()', 'execute'), 'anon cannot execute admin promotion');
 select ok(not has_function_privilege('authenticated', 'private.promote_brickline_admin()', 'execute'), 'authenticated users cannot execute admin promotion');
 select ok(exists(select 1 from pg_trigger where tgname = 'zz_promote_brickline_admin' and not tgisinternal), 'verified-owner promotion trigger exists');
+
+select ok((select relrowsecurity from pg_class where oid = 'public.localities'::regclass), 'localities RLS enabled');
+select ok(has_table_privilege('anon', 'public.localities', 'select'), 'anon can discover localities');
+select ok(not has_table_privilege('authenticated', 'public.localities', 'insert'), 'members cannot forge locality data');
+select ok(not has_function_privilege('authenticated', 'private.handle_new_user()', 'execute'), 'members cannot invoke signup trigger');
+select ok(has_table_privilege('service_role', 'public.profiles', 'update'), 'server admin can review pending profiles');
 
 select * from finish();
 rollback;

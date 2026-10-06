@@ -165,9 +165,37 @@ labelled demo records live in `supabase/migrations/`. Create future migrations
 with `npx supabase migration new <name>` and never edit a migration already
 applied to production.
 
-The initial migration seeds 10 labelled demo projects, 5 builders, and 4 area
-signals. All product screens read these rows through Supabase; production rows
-use `is_demo_record = false` and never receive the Demo record label.
+The migrations and repeatable `supabase/seed.sql` install 10 labelled demo
+projects, 5 builders, 10 localities, and 4 area signals. The seed uses stable IDs
+and ignores existing rows, so rerunning it preserves edits and user records.
+All product screens read projects through Supabase; production rows use
+`is_demo_record = false` and never receive the Demo record label.
+
+To install the schema and demo records in a linked hosted project:
+
+```bash
+npx supabase login
+npx supabase link --project-ref goauxhldkhknprneeejt
+npx supabase db push --include-seed
+```
+
+Alternatively, run migration files in filename order using the Supabase SQL
+editor, then run `supabase/seed.sql`. CLI deployments maintain migration history
+automatically; use the CLI for subsequent migrations if it installed the schema.
+
+Sign up at `/login?mode=signup`, select a profession, and verify the confirmation
+email. New accounts get a pending profile with no panels enabled. The confirmed
+owner account (`mohitsonje4@gmail.com`) receives Admin access from the database
+trigger and can review registrations at `/admin`. Ordinary accounts receive
+their requested role after approval; Builders receive all three panels. Never
+create a second owner account or set a password through a migration.
+
+Before public sign-ups, open Supabase **Authentication → URL Configuration**:
+set Site URL to `https://bricklinereal.vercel.app` and add
+`https://bricklinereal.vercel.app/auth/callback` to Redirect URLs. Also allow
+`http://localhost:3000/auth/callback` for development (or your actual dev port).
+An unlisted redirect falls back to the Site URL; leaving the default localhost
+setting makes production confirmation emails return users to their own computer.
 
 ## Project structure
 

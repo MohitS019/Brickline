@@ -8,19 +8,20 @@ import type { Role } from "@/lib/brickline-data";
 import { createClient } from "@/lib/supabase/client";
 import { BrandLogo } from "./brand-logo";
 
-export function AuthForm({ returnTo, initialRole, adminMode = false }: { returnTo: string; initialRole: Role; adminMode?: boolean }) {
+export function AuthForm({ returnTo, initialRole, adminMode = false, mode = "login", initialMessage = "" }: { returnTo: string; initialRole: Role; adminMode?: boolean; mode?: "login" | "signup"; initialMessage?: string }) {
   const router = useRouter();
-  const [mode, setMode] = useState<"login" | "signup">("login");
   const [role, setRole] = useState<Role>(initialRole);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmation, setConfirmation] = useState("");
+  const [consent, setConsent] = useState(false);
   const [name, setName] = useState("");
   const [company, setCompany] = useState("");
   const [city, setCity] = useState("");
   const [reraNumber, setReraNumber] = useState("");
   const [gstNumber, setGstNumber] = useState("");
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState(initialMessage);
 
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -34,6 +35,11 @@ export function AuthForm({ returnTo, initialRole, adminMode = false }: { returnT
         router.push(returnTo);
         router.refresh();
         return;
+      }
+      if (password !== confirmation) throw new Error("The passwords do not match.");
+      if (!consent) throw new Error("Accept the Privacy Notice to create your account.");
+      if (role !== "Client" && (!/^[A-Za-z0-9/._ -]{3,80}$/.test(reraNumber.trim()) || !/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][A-Z0-9]Z[A-Z0-9]$/.test(gstNumber.trim().toUpperCase()))) {
+        throw new Error("Enter a valid RERA registration and 15-character GST number.");
       }
       if (password.length < 12 || !/[a-z]/.test(password) || !/[A-Z]/.test(password) || !/[0-9]/.test(password) || !/[^A-Za-z0-9]/.test(password)) {
         throw new Error("Use at least 12 characters with uppercase, lowercase, a number, and a symbol.");
@@ -50,6 +56,8 @@ export function AuthForm({ returnTo, initialRole, adminMode = false }: { returnT
             city: city.trim(),
             rera_number: role === "Client" ? "" : reraNumber.trim(),
             gst_number: role === "Client" ? "" : gstNumber.trim().toUpperCase(),
+            privacy_consent: true,
+            consent_version: "2026-09-23",
           },
         },
       });
@@ -85,8 +93,8 @@ export function AuthForm({ returnTo, initialRole, adminMode = false }: { returnT
         </div>
         <form className="access-public-form" onSubmit={submit}>
           {!adminMode && <div className="access-role-picker">
-            <button type="button" className={mode === "login" ? "selected" : ""} onClick={() => setMode("login")}><b>Log in</b></button>
-            <button type="button" className={mode === "signup" ? "selected" : ""} onClick={() => setMode("signup")}><b>Sign up</b></button>
+            <Link className={mode === "login" ? "selected" : ""} aria-current={mode === "login" ? "page" : undefined} href={`/login?returnTo=${encodeURIComponent(returnTo)}`} prefetch={false}><b>Log in</b></Link>
+            <Link className={mode === "signup" ? "selected" : ""} aria-current={mode === "signup" ? "page" : undefined} href={`/login?mode=signup&returnTo=${encodeURIComponent(returnTo)}`} prefetch={false}><b>Sign up</b></Link>
           </div>}
           {mode === "signup" && (
             <fieldset className="access-role-picker">
@@ -102,10 +110,12 @@ export function AuthForm({ returnTo, initialRole, adminMode = false }: { returnT
           {mode === "signup" && <label>Full name<input required minLength={2} maxLength={120} value={name} onChange={(event) => setName(event.target.value)} /></label>}
           <label>Email<input required type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} /></label>
           <label>Password<input required type="password" autoComplete={mode === "login" ? "current-password" : "new-password"} minLength={mode === "login" ? 8 : 12} value={password} onChange={(event) => setPassword(event.target.value)} />{mode === "signup" && <small>12+ characters with uppercase, lowercase, a number, and a symbol.</small>}</label>
+          {mode === "signup" && <label>Confirm password<input required type="password" autoComplete="new-password" minLength={12} value={confirmation} onChange={(event) => setConfirmation(event.target.value)} /></label>}
           {mode === "signup" && <label>{role === "Client" ? "Company (optional)" : "Company or agency"}<input required={role !== "Client"} maxLength={120} value={company} onChange={(event) => setCompany(event.target.value)} /></label>}
           {mode === "signup" && <label>City<input required maxLength={120} value={city} onChange={(event) => setCity(event.target.value)} /></label>}
           {mode === "signup" && role !== "Client" && <label>{role === "Builder" ? "RERA promoter registration" : "RERA agent registration"}<input required maxLength={80} value={reraNumber} onChange={(event) => setReraNumber(event.target.value)} /></label>}
           {mode === "signup" && role !== "Client" && <label>GST number<input required minLength={15} maxLength={15} value={gstNumber} onChange={(event) => setGstNumber(event.target.value.toUpperCase())} /></label>}
+          {mode === "signup" && <label className="consent-choice"><input type="checkbox" required checked={consent} onChange={(event) => setConsent(event.target.checked)} /><span>I have read the <Link href="/privacy" target="_blank">Privacy Notice</Link> and consent to the stated verification and access processing.</span></label>}
           {message && <p className="access-form-message" role="status">{message}</p>}
           <button className="reference-primary" disabled={busy}>{busy ? "Please wait…" : mode === "login" ? "Log in" : "Create account"}</button>
         </form>

@@ -50,7 +50,9 @@ export default function WorkspaceApp({
   const [panelContent, setPanelContent] = useState(initialPanelContent);
   const [view, setView] = useState<ViewId>(initialView);
   const [role, setRole] = useState<Role>(
-    panelAccess.allowedRoles[0] || "Agent",
+    panelAccess.requestedRole && panelAccess.allowedRoles.includes(panelAccess.requestedRole)
+      ? panelAccess.requestedRole
+      : panelAccess.allowedRoles[0] || "Agent",
   );
   const [mobileOpen, setMobileOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);

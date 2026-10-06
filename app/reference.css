@@ -4594,14 +4594,16 @@ button.entity-project-builder:hover {
   grid-column: 1/-1;
   margin-bottom: 2px;
 }
-.access-role-picker label {
+.access-role-picker label,
+.access-role-picker > a {
   min-height: 52px;
   border: 1px solid var(--line);
   display: grid;
   place-items: center;
   cursor: pointer;
 }
-.access-role-picker label.selected {
+.access-role-picker label.selected,
+.access-role-picker > a.selected {
   border-color: var(--coral);
   background: #fff4ef;
   color: var(--coral);
