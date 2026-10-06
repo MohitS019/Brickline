@@ -23,7 +23,7 @@ select ok(has_table_privilege('authenticated', 'public.profiles', 'select'), 'au
 select ok(not has_table_privilege('authenticated', 'public.profiles', 'delete'), 'authenticated users cannot delete profiles');
 select ok(not has_table_privilege('anon', 'public.introductions', 'select'), 'anon cannot select introductions');
 select ok(has_table_privilege('authenticated', 'public.introductions', 'select'), 'authenticated role can reach introduction select policies');
-select ok(has_table_privilege('authenticated', 'public.introductions', 'insert'), 'authenticated role can reach introduction insert policies');
+select ok(has_any_column_privilege('authenticated', 'public.introductions', 'insert'), 'authenticated role can reach permitted introduction insert columns');
 select ok(not has_table_privilege('authenticated', 'public.introductions', 'delete'), 'authenticated users cannot delete introductions');
 select ok(not has_table_privilege('anon', 'public.audit_events', 'select'), 'anon cannot read audit events');
 select ok(has_table_privilege('authenticated', 'public.audit_events', 'select'), 'authenticated role can reach admin audit policy');
